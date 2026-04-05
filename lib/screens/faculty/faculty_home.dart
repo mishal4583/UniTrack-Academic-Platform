@@ -1,11 +1,28 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// faculty_home.dart  —  Route: /faculty
-// Real Firestore data, no mock, zero overflow, same architecture as student side.
+// faculty_home.dart   Route: /faculty
+//
+// FIXES in this version:
+//   1. Removed the Stack + Column(Expanded) wrapper from the child passed to
+//      FacultyDashboardLayout. The layout already provides a SingleChildScrollView
+//      so putting Expanded inside it caused "unbounded height" crash + black screen.
+//      The child is now a plain Column(mainAxisSize: min) with all the dashboard
+//      sections listed directly.
+//
+//   2. _setFuture() no longer calls setState(() => _future = f) where f is a
+//      Future — that pattern makes setState's callback return a Future, which
+//      Flutter rejects. Instead, _future is assigned BEFORE calling setState,
+//      and setState only triggers a rebuild with no async work inside it.
+//
+//   3. Removed the standalone _FacultyTopBar, _FacultyBottomNav, and _GridPainter
+//      from this file — FacultyDashboardLayout already renders all of those.
+//      Keeping them here was causing a double-header / double-background.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'faculty_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
@@ -26,7 +43,7 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD DATA MODEL
+// DATA MODELS
 // ─────────────────────────────────────────────────────────────────────────────
 class _FacultyData {
   final int activitiesCount;
@@ -49,27 +66,20 @@ class _FacultyData {
 }
 
 class _ActivityRow {
-  final String id;
-  final String title;
-  final int enrolled;
-  final int credits;
-  final String date;
-  final String status;
+  final String id, title, date, status;
+  final int enrolled, credits;
   const _ActivityRow({
     required this.id,
     required this.title,
-    required this.enrolled,
-    required this.credits,
     required this.date,
     required this.status,
+    required this.enrolled,
+    required this.credits,
   });
 }
 
 class _PendingRow {
-  final String enrollmentId;
-  final String userId;
-  final String activityTitle;
-  final String type; // "activity" | "volunteering"
+  final String enrollmentId, userId, activityTitle, type;
   const _PendingRow({
     required this.enrollmentId,
     required this.userId,
@@ -79,10 +89,8 @@ class _PendingRow {
 }
 
 class _VolRow {
-  final String id;
-  final String title;
+  final String id, title, status;
   final int applicants;
-  final String status;
   const _VolRow({
     required this.id,
     required this.title,
@@ -100,16 +108,11 @@ class _FacultyService {
   static Map<String, dynamic> _safe(DocumentSnapshot doc) =>
       (doc.data() as Map<String, dynamic>?) ?? {};
 
-  static Future<_FacultyData> load(String uid, String facultyName) async {
-    // ── Parallel top-level fetches ───────────────────────────────────────────
+  static Future<_FacultyData> load(String uid) async {
     final results = await Future.wait([
-      // [0] activities where faculty field matches
       _db.collection('activities').where('createdBy', isEqualTo: uid).get(),
-      // [1] volunteering where createdBy == uid
       _db.collection('volunteering').where('createdBy', isEqualTo: uid).get(),
-      // [2] all enrollments (to find unique students + pending)
       _db.collection('enrollments').get(),
-      // [3] all applications (to find unique students + pending)
       _db.collection('applications').get(),
     ]);
 
@@ -118,7 +121,6 @@ class _FacultyService {
     final enrSnap = results[2] as QuerySnapshot;
     final appSnap = results[3] as QuerySnapshot;
 
-    // ── Unique students ──────────────────────────────────────────────────────
     final actIds = actSnap.docs.map((d) => d.id).toSet();
     final volIds = volSnap.docs.map((d) => d.id).toSet();
 
@@ -126,68 +128,63 @@ class _FacultyService {
     for (final doc in enrSnap.docs) {
       final d = _safe(doc);
       if (actIds.contains((d['activityId'] as String?) ?? '')) {
-        final uid2 = (d['userId'] as String?) ?? '';
-        if (uid2.isNotEmpty) studentSet.add(uid2);
+        final u = (d['userId'] as String?) ?? '';
+        if (u.isNotEmpty) studentSet.add(u);
       }
     }
     for (final doc in appSnap.docs) {
       final d = _safe(doc);
       if (volIds.contains((d['volunteeringId'] as String?) ?? '')) {
-        final uid2 = (d['userId'] as String?) ?? '';
-        if (uid2.isNotEmpty) studentSet.add(uid2);
+        final u = (d['userId'] as String?) ?? '';
+        if (u.isNotEmpty) studentSet.add(u);
       }
     }
 
-    // ── Pending verifications ────────────────────────────────────────────────
-    final pendingItems = <_PendingRow>[];
-
+    final pending = <_PendingRow>[];
     for (final doc in enrSnap.docs) {
       final d = _safe(doc);
       if ((d['status'] as String?) == 'Enrolled' &&
           actIds.contains((d['activityId'] as String?) ?? '')) {
-        final actId = (d['activityId'] as String?) ?? '';
-        final actDocList = actSnap.docs.where((a) => a.id == actId).toList();
-        final actDoc = actDocList.isNotEmpty ? actDocList.first : null;
-        pendingItems.add(
+        final aid = (d['activityId'] as String?) ?? '';
+        final actDoc = actSnap.docs.where((a) => a.id == aid).firstOrNull;
+        pending.add(
           _PendingRow(
             enrollmentId: doc.id,
             userId: (d['userId'] as String?) ?? '',
             activityTitle: actDoc != null
                 ? (_safe(actDoc)['title'] as String?) ?? ''
-                : actId,
+                : aid,
             type: 'activity',
           ),
         );
       }
     }
-
     for (final doc in appSnap.docs) {
       final d = _safe(doc);
       if ((d['status'] as String?) == 'Applied' &&
           volIds.contains((d['volunteeringId'] as String?) ?? '')) {
-        final volId = (d['volunteeringId'] as String?) ?? '';
-        final volDoc = volSnap.docs.where((v) => v.id == volId).firstOrNull;
-        pendingItems.add(
+        final vid = (d['volunteeringId'] as String?) ?? '';
+        final volDoc = volSnap.docs.where((v) => v.id == vid).firstOrNull;
+        pending.add(
           _PendingRow(
             enrollmentId: doc.id,
             userId: (d['userId'] as String?) ?? '',
             activityTitle: volDoc != null
                 ? (_safe(volDoc)['title'] as String?) ?? ''
-                : volId,
+                : vid,
             type: 'volunteering',
           ),
         );
       }
     }
 
-    // ── Recent activities (up to 5, newest first) ────────────────────────────
-    final sorted = [...actSnap.docs];
-    sorted.sort((a, b) {
-      final ta = _safe(a)['createdAt'];
-      final tb = _safe(b)['createdAt'];
-      if (ta is Timestamp && tb is Timestamp) return tb.compareTo(ta);
-      return 0;
-    });
+    final sorted = [...actSnap.docs]
+      ..sort((a, b) {
+        final ta = _safe(a)['createdAt'];
+        final tb = _safe(b)['createdAt'];
+        if (ta is Timestamp && tb is Timestamp) return tb.compareTo(ta);
+        return 0;
+      });
 
     final recentActivities = sorted.take(5).map((doc) {
       final d = _safe(doc);
@@ -201,7 +198,6 @@ class _FacultyService {
       );
     }).toList();
 
-    // ── Volunteering requests (up to 4) ──────────────────────────────────────
     final volRows = volSnap.docs.take(4).map((doc) {
       final d = _safe(doc);
       return _VolRow(
@@ -216,9 +212,9 @@ class _FacultyService {
       activitiesCount: actSnap.docs.length,
       volunteeringCount: volSnap.docs.length,
       uniqueStudents: studentSet.length,
-      pendingVerifications: pendingItems.length,
+      pendingVerifications: pending.length,
       recentActivities: recentActivities,
-      pendingItems: pendingItems.take(5).toList(),
+      pendingItems: pending.take(5).toList(),
       volunteeringRequests: volRows,
     );
   }
@@ -230,40 +226,15 @@ class _FacultyService {
 class _VerifyService {
   static final _db = FirebaseFirestore.instance;
 
-  static Future<void> approve(_PendingRow row) async {
-    final col = row.type == 'activity' ? 'enrollments' : 'applications';
-    await _db.collection(col).doc(row.enrollmentId).update({
-      'status': row.type == 'activity' ? 'Completed' : 'Approved',
-    });
-  }
+  static Future<void> approve(_PendingRow row) => _db
+      .collection(row.type == 'activity' ? 'enrollments' : 'applications')
+      .doc(row.enrollmentId)
+      .update({'status': row.type == 'activity' ? 'Completed' : 'Approved'});
 
-  static Future<void> reject(_PendingRow row) async {
-    final col = row.type == 'activity' ? 'enrollments' : 'applications';
-    await _db.collection(col).doc(row.enrollmentId).update({
-      'status': 'Rejected',
-    });
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GRID PAINTER
-// ─────────────────────────────────────────────────────────────────────────────
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF1F2937).withValues(alpha: 0.3)
-      ..strokeWidth = 0.8;
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    }
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter _) => false;
+  static Future<void> reject(_PendingRow row) => _db
+      .collection(row.type == 'activity' ? 'enrollments' : 'applications')
+      .doc(row.enrollmentId)
+      .update({'status': 'Rejected'});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -282,13 +253,13 @@ class _Card extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 12),
     padding: padding ?? const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: _C.card.withValues(alpha: 0.75),
+      color: _C.card.withOpacity(0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
       boxShadow: glowColor != null
           ? [
               BoxShadow(
-                color: glowColor!.withValues(alpha: 0.2),
+                color: glowColor!.withOpacity(0.2),
                 blurRadius: 18,
                 spreadRadius: 1,
               ),
@@ -329,21 +300,25 @@ class _BlockchainBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        border: Border.all(color: color.withOpacity(0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 10, color: color),
           const SizedBox(width: 3),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
         ],
@@ -356,7 +331,6 @@ class _GradientButton extends StatelessWidget {
   final String label;
   final IconData? icon;
   final VoidCallback onTap;
-
   const _GradientButton({required this.label, required this.onTap, this.icon});
 
   @override
@@ -399,7 +373,6 @@ class _SmallButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-
   const _SmallButton({
     required this.label,
     required this.color,
@@ -435,8 +408,7 @@ class _SmallButton extends StatelessWidget {
 // STAT CARD
 // ─────────────────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
+  final String label, value;
   final IconData icon;
   final Color iconColor;
   final String? trend;
@@ -453,7 +425,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: _C.card.withValues(alpha: 0.75),
+      color: _C.card.withOpacity(0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
     ),
@@ -482,7 +454,7 @@ class _StatCard extends StatelessWidget {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.1),
+                color: iconColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: iconColor, size: 15),
@@ -521,242 +493,7 @@ class _StatCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PULSING DOT
-// ─────────────────────────────────────────────────────────────────────────────
-class _PulsingDot extends StatefulWidget {
-  const _PulsingDot();
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat(reverse: true);
-    _anim = Tween(begin: 0.3, end: 1.0).animate(_ctrl);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-    opacity: _anim,
-    child: Container(
-      width: 7,
-      height: 7,
-      decoration: const BoxDecoration(
-        color: _C.neonCyan,
-        shape: BoxShape.circle,
-      ),
-    ),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TOP BAR
-// ─────────────────────────────────────────────────────────────────────────────
-class _FacultyTopBar extends StatelessWidget {
-  final String userName;
-  const _FacultyTopBar({required this.userName});
-
-  @override
-  Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(16, topPad + 8, 16, 10),
-      decoration: BoxDecoration(
-        color: _C.card.withValues(alpha: 0.7),
-        border: const Border(bottom: BorderSide(color: _C.border)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [_C.primary, _C.neonBlue]),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.shield_rounded,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'UniTrack',
-                style: TextStyle(
-                  color: _C.text,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                'Faculty Portal',
-                style: TextStyle(color: _C.muted, fontSize: 10),
-              ),
-            ],
-          ),
-          const Spacer(),
-          // Network badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _C.neonCyan.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _C.neonCyan.withValues(alpha: 0.3)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _PulsingDot(),
-                SizedBox(width: 6),
-                Text(
-                  'Connected ✔',
-                  style: TextStyle(
-                    color: _C.neonCyan,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Avatar
-          Container(
-            width: 30,
-            height: 30,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [_C.primary, _C.neonBlue]),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                userName.isNotEmpty ? userName[0].toUpperCase() : 'F',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BOTTOM NAV — Faculty
-// ─────────────────────────────────────────────────────────────────────────────
-class _NavItem {
-  final String label;
-  final IconData icon;
-  final String route;
-  const _NavItem({
-    required this.label,
-    required this.icon,
-    required this.route,
-  });
-}
-
-const _navItems = [
-  _NavItem(label: 'Home', icon: Icons.dashboard_rounded, route: '/faculty'),
-  _NavItem(
-    label: 'Activities',
-    icon: Icons.menu_book_rounded,
-    route: '/faculty/create',
-  ),
-  _NavItem(
-    label: 'Volunteer',
-    icon: Icons.eco_rounded,
-    route: '/faculty/volunteering/create',
-  ),
-  _NavItem(
-    label: 'Verify',
-    icon: Icons.fact_check_rounded,
-    route: '/faculty/verify',
-  ),
-  _NavItem(
-    label: 'Analytics',
-    icon: Icons.bar_chart_rounded,
-    route: '/faculty/analytics',
-  ),
-];
-
-class _FacultyBottomNav extends StatelessWidget {
-  final String currentRoute;
-  const _FacultyBottomNav({required this.currentRoute});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: const BoxDecoration(
-      color: _C.card,
-      border: Border(top: BorderSide(color: _C.border, width: 1)),
-    ),
-    child: SafeArea(
-      top: false,
-      child: SizedBox(
-        height: 58,
-        child: Row(
-          children: _navItems.map((item) {
-            final isActive = currentRoute == item.route;
-            final color = isActive ? _C.primary : _C.muted;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  if (currentRoute != item.route) {
-                    Navigator.pushReplacementNamed(context, item.route);
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(item.icon, size: 21, color: color),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                        color: color,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    ),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION: STAT GRID
+// UI SECTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 class _StatGrid extends StatelessWidget {
   final _FacultyData data;
@@ -819,9 +556,6 @@ class _StatGrid extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION: QUICK ACTIONS
-// ─────────────────────────────────────────────────────────────────────────────
 class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
@@ -850,18 +584,21 @@ class _QuickActions extends StatelessWidget {
                 icon: Icons.add_circle_rounded,
                 route: '/faculty/create',
                 color: _C.primary,
+                peer: false,
               ),
               (
                 label: 'Create Volunteer',
                 icon: Icons.eco_rounded,
                 route: '/faculty/volunteering/create',
                 color: _C.neonGreen,
+                peer: false,
               ),
               (
                 label: 'Verify Students',
                 icon: Icons.fact_check_rounded,
                 route: '/faculty/verify',
                 color: _C.neonCyan,
+                peer: true,
               ),
             ];
             return Wrap(
@@ -872,16 +609,15 @@ class _QuickActions extends StatelessWidget {
                     (a) => SizedBox(
                       width: w,
                       child: GestureDetector(
-                        onTap: () =>
-                            Navigator.pushReplacementNamed(context, a.route),
+                        onTap: () => a.peer
+                            ? Navigator.pushReplacementNamed(context, a.route)
+                            : Navigator.pushNamed(context, a.route),
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color: a.color.withValues(alpha: 0.1),
+                            color: a.color.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: a.color.withValues(alpha: 0.3),
-                            ),
+                            border: Border.all(color: a.color.withOpacity(0.3)),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -914,9 +650,6 @@ class _QuickActions extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION: RECENT ACTIVITIES TABLE
-// ─────────────────────────────────────────────────────────────────────────────
 class _RecentActivities extends StatelessWidget {
   final List<_ActivityRow> items;
   const _RecentActivities({required this.items});
@@ -977,11 +710,10 @@ class _RecentActivities extends StatelessWidget {
             ],
           ),
         ),
-        // Table header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: _C.secondary.withValues(alpha: 0.5),
+            color: _C.secondary.withOpacity(0.5),
             border: const Border(
               top: BorderSide(color: _C.border),
               bottom: BorderSide(color: _C.border),
@@ -1131,14 +863,10 @@ class _RecentActivities extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION: PENDING VERIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
 class _PendingVerifications extends StatefulWidget {
   final List<_PendingRow> items;
   final VoidCallback onRefresh;
   const _PendingVerifications({required this.items, required this.onRefresh});
-
   @override
   State<_PendingVerifications> createState() => _PendingVerificationsState();
 }
@@ -1146,28 +874,23 @@ class _PendingVerifications extends StatefulWidget {
 class _PendingVerificationsState extends State<_PendingVerifications> {
   final _processing = <String>{};
 
-  Future<void> _approve(_PendingRow row) async {
+  Future<void> _act(_PendingRow row, bool approve) async {
+    if (!mounted) return;
     setState(() => _processing.add(row.enrollmentId));
     try {
-      await _VerifyService.approve(row);
+      if (approve) {
+        await _VerifyService.approve(row);
+      } else {
+        await _VerifyService.reject(row);
+      }
       if (mounted) widget.onRefresh();
+    } catch (_) {
     } finally {
       if (mounted) setState(() => _processing.remove(row.enrollmentId));
     }
   }
 
-  Future<void> _reject(_PendingRow row) async {
-    setState(() => _processing.add(row.enrollmentId));
-    try {
-      await _VerifyService.reject(row);
-      if (mounted) widget.onRefresh();
-    } finally {
-      if (mounted) setState(() => _processing.remove(row.enrollmentId));
-    }
-  }
-
-  String _initial(String userId) =>
-      userId.isNotEmpty ? userId[0].toUpperCase() : 'S';
+  String _initial(String u) => u.isNotEmpty ? u[0].toUpperCase() : 'S';
 
   @override
   Widget build(BuildContext context) => Column(
@@ -1279,8 +1002,8 @@ class _PendingVerificationsState extends State<_PendingVerifications> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: row.type == 'activity'
-                                      ? _C.primary.withValues(alpha: 0.1)
-                                      : _C.neonGreen.withValues(alpha: 0.1),
+                                      ? _C.primary.withOpacity(0.1)
+                                      : _C.neonGreen.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -1319,7 +1042,7 @@ class _PendingVerificationsState extends State<_PendingVerifications> {
                             child: _SmallButton(
                               label: '✔ Verify',
                               color: _C.neonCyan,
-                              onTap: () => _approve(row),
+                              onTap: () => _act(row, true),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1327,7 +1050,7 @@ class _PendingVerificationsState extends State<_PendingVerifications> {
                             child: _SmallButton(
                               label: '✕ Reject',
                               color: _C.amber,
-                              onTap: () => _reject(row),
+                              onTap: () => _act(row, false),
                             ),
                           ),
                         ],
@@ -1340,9 +1063,6 @@ class _PendingVerificationsState extends State<_PendingVerifications> {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION: VOLUNTEERING REQUESTS
-// ─────────────────────────────────────────────────────────────────────────────
 class _VolunteeringRequests extends StatelessWidget {
   final List<_VolRow> items;
   const _VolunteeringRequests({required this.items});
@@ -1388,9 +1108,9 @@ class _VolunteeringRequests extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _C.secondary.withValues(alpha: 0.5),
+                color: _C.secondary.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _C.border.withValues(alpha: 0.5)),
+                border: Border.all(color: _C.border.withOpacity(0.5)),
               ),
               child: Row(
                 children: [
@@ -1424,8 +1144,8 @@ class _VolunteeringRequests extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: row.status == 'full'
-                          ? _C.muted.withValues(alpha: 0.1)
-                          : _C.neonGreen.withValues(alpha: 0.1),
+                          ? _C.muted.withOpacity(0.1)
+                          : _C.neonGreen.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -1446,9 +1166,6 @@ class _VolunteeringRequests extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION: SMART CONTRACT CARD
-// ─────────────────────────────────────────────────────────────────────────────
 class _SmartContractCard extends StatelessWidget {
   const _SmartContractCard();
 
@@ -1461,7 +1178,7 @@ class _SmartContractCard extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: _C.neonCyan.withValues(alpha: 0.1),
+            color: _C.neonCyan.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(Icons.bolt_rounded, color: _C.neonCyan, size: 22),
@@ -1499,9 +1216,6 @@ class _SmartContractCard extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SECTION: MINI ANALYTICS
-// ─────────────────────────────────────────────────────────────────────────────
 class _MiniAnalytics extends StatelessWidget {
   final _FacultyData data;
   const _MiniAnalytics({required this.data});
@@ -1589,10 +1303,7 @@ class _MiniAnalytics extends StatelessWidget {
                             child: Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [
-                                    b.color,
-                                    b.color.withValues(alpha: 0.6),
-                                  ],
+                                  colors: [b.color, b.color.withOpacity(0.6)],
                                 ),
                               ),
                             ),
@@ -1613,186 +1324,177 @@ class _MiniAnalytics extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN — FACULTY HOME
+// MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 class FacultyHome extends StatefulWidget {
   const FacultyHome({super.key});
-
   @override
   State<FacultyHome> createState() => _FacultyHomeState();
 }
 
 class _FacultyHomeState extends State<FacultyHome> {
-  late Future<_FacultyData> _future;
+  // ── FIX: _future is initialised to a completed no-op Future so `late` is safe
+  //    and setState never receives an async callback.
+  Future<_FacultyData> _future = Future.value(
+    const _FacultyData(
+      activitiesCount: 0,
+      volunteeringCount: 0,
+      uniqueStudents: 0,
+      pendingVerifications: 0,
+      recentActivities: [],
+      pendingItems: [],
+      volunteeringRequests: [],
+    ),
+  );
   String _displayName = '';
+  String _uid = '';
 
   @override
   void initState() {
     super.initState();
-    _init();
+    // ── Use Future.microtask so initState itself stays synchronous.
+    //    This prevents "setState() callback returned a Future" entirely.
+    Future.microtask(_bootstrap);
   }
 
-  void _init() {
+  Future<void> _bootstrap() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    _uid = user.uid;
 
-    // Load user profile first for faculty name (needed for activity query)
-    FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((
-      doc,
-    ) {
-      final d = doc.data() ?? {};
-      final name = (d['name'] as String?) ?? '';
-
-      if (!mounted) return;
-
-      setState(() {
-        _displayName = name;
-        _future = _FacultyService.load(user.uid, name);
-      });
+    // ── Assign future BEFORE calling setState — setState's callback is sync.
+    final f = _FacultyService.load(_uid);
+    if (!mounted) return;
+    setState(() {
+      _future = f;
     });
 
-    // Start with uid as faculty identifier fallback
-    _future = _FacultyService.load(user.uid, user.uid);
+    // ── Fetch display name separately; check mounted before setState.
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .get();
+      if (!mounted) return;
+      final name = (doc.data()?['name'] as String?) ?? '';
+      if (name.isNotEmpty) setState(() => _displayName = name);
+    } catch (_) {}
   }
 
-  void _refresh() => setState(_init);
+  void _refresh() {
+    if (!mounted) return;
+    // ── Same pattern: compute future synchronously then pass it to setState.
+    final f = _FacultyService.load(_uid);
+    setState(() {
+      _future = f;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final botPad = MediaQuery.of(context).padding.bottom;
+    // ── FIX: the child passed to FacultyDashboardLayout must NOT use Expanded.
+    //    The layout wraps child in SingleChildScrollView, which provides an
+    //    unbounded vertical constraint — Expanded is illegal there.
+    //    We use a plain Column(mainAxisSize: min) instead.
+    return FacultyDashboardLayout(
+      currentRoute: '/faculty',
+      userName: _displayName,
+      child: FutureBuilder<_FacultyData>(
+        future: _future,
+        builder: (context, snap) {
+          // ── Loading
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 80),
+              child: Center(
+                child: CircularProgressIndicator(color: _C.primary),
+              ),
+            );
+          }
 
-    return Scaffold(
-      backgroundColor: _C.bg,
-      extendBody: true,
-      bottomNavigationBar: const _FacultyBottomNav(currentRoute: '/faculty'),
-      body: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-          Column(
-            children: [
-              _FacultyTopBar(userName: _displayName),
-              Expanded(
-                child: FutureBuilder<_FacultyData>(
-                  future: _future,
-                  builder: (context, snap) {
-                    // ── Loading ──────────────────────────────────────────
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: _C.primary),
-                      );
-                    }
-
-                    // ── Error ────────────────────────────────────────────
-                    if (snap.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.error_outline_rounded,
-                                color: Colors.redAccent,
-                                size: 40,
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Failed to load dashboard',
-                                style: TextStyle(
-                                  color: _C.text,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                snap.error.toString(),
-                                style: const TextStyle(
-                                  color: _C.muted,
-                                  fontSize: 12,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 20),
-                              _GradientButton(
-                                label: 'Retry',
-                                icon: Icons.refresh_rounded,
-                                onTap: _refresh,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    // ── Data ─────────────────────────────────────────────
-                    final data = snap.data!;
-
-                    return SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(16, 16, 16, botPad + 72),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // ── HEADER ──────────────────────────────────────
-                          Text(
-                            'Welcome, ${_displayName.isNotEmpty ? _displayName : 'Faculty'} 👋',
-                            style: const TextStyle(
-                              color: _C.text,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Manage activities, verify participation & trigger smart contracts',
-                            style: TextStyle(color: _C.muted, fontSize: 12),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // ── STAT GRID ────────────────────────────────────
-                          _StatGrid(data: data),
-
-                          const SizedBox(height: 20),
-
-                          // ── QUICK ACTIONS ────────────────────────────────
-                          const _QuickActions(),
-
-                          const SizedBox(height: 8),
-
-                          // ── RECENT ACTIVITIES TABLE ──────────────────────
-                          _RecentActivities(items: data.recentActivities),
-
-                          // ── SMART CONTRACT ───────────────────────────────
-                          const _SmartContractCard(),
-
-                          // ── VOLUNTEERING REQUESTS ────────────────────────
-                          _VolunteeringRequests(
-                            items: data.volunteeringRequests,
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          // ── PENDING VERIFICATIONS + MINI ANALYTICS ───────
-                          _PendingVerifications(
-                            items: data.pendingItems,
-                            onRefresh: _refresh,
-                          ),
-
-                          _MiniAnalytics(data: data),
-                        ],
+          // ── Error
+          if (snap.hasError) {
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 40,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Failed to load dashboard',
+                      style: TextStyle(
+                        color: _C.text,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      snap.error.toString(),
+                      style: const TextStyle(color: _C.muted, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    _GradientButton(
+                      label: 'Retry',
+                      icon: Icons.refresh_rounded,
+                      onTap: _refresh,
+                    ),
+                  ],
                 ),
               ),
+            );
+          }
+
+          // ── Data
+          final data = snap.data!;
+
+          // ── IMPORTANT: Column with mainAxisSize.min — no Expanded, no Flexible.
+          //    FacultyDashboardLayout's SingleChildScrollView is the scroll ancestor.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // ← critical fix
+            children: [
+              Text(
+                'Welcome, ${_displayName.isNotEmpty ? _displayName : 'Faculty'} 👋',
+                style: const TextStyle(
+                  color: _C.text,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Manage activities, verify participation & trigger smart contracts',
+                style: TextStyle(color: _C.muted, fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 20),
+              _StatGrid(data: data),
+              const SizedBox(height: 20),
+              const _QuickActions(),
+              const SizedBox(height: 8),
+              _RecentActivities(items: data.recentActivities),
+              const _SmartContractCard(),
+              _VolunteeringRequests(items: data.volunteeringRequests),
+              const SizedBox(height: 8),
+              _PendingVerifications(
+                items: data.pendingItems,
+                onRefresh: _refresh,
+              ),
+              _MiniAnalytics(data: data),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }

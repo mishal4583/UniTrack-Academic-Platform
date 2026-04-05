@@ -79,6 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "email": email.text,
         "role": selectedRole,
         "createdAt": Timestamp.now(),
+        "isActive": true, // ✅ ADD THIS LINE
       };
 
       if (selectedRole == "student") {

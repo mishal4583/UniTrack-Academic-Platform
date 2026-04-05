@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:unitrack_flutter/screens/auth/login_screen.dart';
 import 'package:unitrack_flutter/screens/student/student_home.dart';
 import 'package:unitrack_flutter/screens/faculty/faculty_home.dart';
-import 'package:unitrack_flutter/screens/admin_home.dart';
+import 'package:unitrack_flutter/screens/admin/admin_dashboard_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -16,15 +16,13 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // 🔄 Loading
+        // 🔄 Loading auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const _LoadingScreen();
         }
 
         // ❌ Not logged in
-        if (!snapshot.hasData) {
+        if (!snapshot.hasData || snapshot.data == null) {
           return const LoginScreen();
         }
 
@@ -36,51 +34,71 @@ class AuthGate extends StatelessWidget {
               .doc(user.uid)
               .get(),
           builder: (context, roleSnap) {
-            // 🔄 Loading
+            // 🔄 Loading user role
             if (roleSnap.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
+              return const _LoadingScreen();
             }
 
-            // ❌ Error
+            // ❌ Firestore error
             if (roleSnap.hasError) {
-              return Scaffold(
-                body: Center(
-                  child: Text(
-                    "Error: ${roleSnap.error}",
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ),
-              );
+              debugPrint("AuthGate Firestore error: ${roleSnap.error}");
+              return const _ErrorScreen(message: "Failed to load user data");
             }
 
-            // ❌ No user doc
+            // ❌ No user document
             if (!roleSnap.hasData || !roleSnap.data!.exists) {
-              return const Scaffold(
-                body: Center(child: Text("User data not found")),
-              );
+              debugPrint("User document missing for uid: ${user.uid}");
+              return const _ErrorScreen(message: "User data not found");
             }
 
-            // ✅ SAFE DATA
             final data = roleSnap.data!.data() as Map<String, dynamic>? ?? {};
 
-            final role = (data['role'] ?? 'student').toString();
+            final role = (data['role'] ?? '').toString().toLowerCase();
 
-            // 🎯 ROUTING
+            debugPrint("User role: $role");
+
+            // 🎯 ROLE-BASED ROUTING
             switch (role) {
-              case "student":
+              case 'student':
                 return const StudentHome();
-              case "faculty":
+              case 'faculty':
                 return const FacultyHome();
-              case "admin":
-                return const AdminHome();
+              case 'admin':
+                return const AdminDashboardScreen();
               default:
+                debugPrint("Unknown role, defaulting to student");
                 return const StudentHome();
             }
           },
         );
       },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 🔹 COMMON UI COMPONENTS
+// ─────────────────────────────────────────────────────────────
+
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  }
+}
+
+class _ErrorScreen extends StatelessWidget {
+  final String message;
+  const _ErrorScreen({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text(message, style: const TextStyle(color: Colors.red)),
+      ),
     );
   }
 }

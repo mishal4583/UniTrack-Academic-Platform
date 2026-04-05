@@ -91,22 +91,33 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: Column(
                           children: [
-                            // 🔷 LOGO
+                            // 🔥 PERFECT LOGO BLOCK
                             Container(
-                              width: 64,
-                              height: 64,
+                              width: 120,
+                              height: 120,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(28),
                                 gradient: const LinearGradient(
                                   colors: [primary, neonBlue],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: primary.withValues(alpha: 0.4),
+                                    blurRadius: 30,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(28),
+                                child: Image.asset(
+                                  'assets/logo/logo.png',
+                                  fit: BoxFit.cover, // 🔥 IMPORTANT
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.shield,
-                                color: Colors.white,
-                              ),
                             ),
-
                             const SizedBox(height: 12),
 
                             // TITLE
@@ -161,7 +172,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                           Icon(
                                             r["icon"] as IconData,
                                             size: 20,
-                                            color: selected ? primary : muted,
+                                            color: selected
+                                                ? primary
+                                                : const Color.fromARGB(
+                                                    255,
+                                                    33,
+                                                    36,
+                                                    40,
+                                                  ),
                                           ),
                                           const SizedBox(height: 4),
                                           Text(

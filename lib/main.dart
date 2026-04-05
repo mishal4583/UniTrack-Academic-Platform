@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:unitrack_flutter/screens/faculty/faculty_analytics_screen.dart';
-import 'package:unitrack_flutter/screens/faculty/faculty_verify_screen.dart';
+import 'package:unitrack_flutter/screens/faculty/faculty_manage_detail_screen.dart';
+import 'package:unitrack_flutter/screens/faculty/faculty_manage_screen.dart';
+import 'package:unitrack_flutter/screens/student/Student_certificates_screen.dart';
+import 'package:unitrack_flutter/screens/student/Student_profile_screen.dart';
+import 'package:unitrack_flutter/screens/student/Studentrecommendationscreen.dart';
+import 'package:unitrack_flutter/screens/student/student_my_progress_screen.dart';
 import 'firebase_options.dart';
 
 // AUTH
@@ -17,6 +21,15 @@ import 'package:unitrack_flutter/screens/student/student_activities_screen.dart'
 import 'package:unitrack_flutter/screens/faculty/faculty_home.dart';
 import 'package:unitrack_flutter/screens/faculty/faculty_create_activity.dart';
 import 'package:unitrack_flutter/screens/faculty/faculty_create_volunteering.dart';
+import 'package:unitrack_flutter/screens/faculty/faculty_verify_screen.dart';
+import 'package:unitrack_flutter/screens/faculty/faculty_analytics_screen.dart';
+import 'package:unitrack_flutter/screens/faculty/faculty_profile_screen.dart';
+
+// ADMIN
+import 'package:unitrack_flutter/screens/admin/admin_dashboard_screen.dart';
+import 'package:unitrack_flutter/screens/admin/admin_users_screen.dart';
+import 'package:unitrack_flutter/screens/admin/admin_content_screen.dart';
+import 'package:unitrack_flutter/screens/admin/admin_logs_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,71 +45,90 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'UniTrack',
       debugShowCheckedModeBanner: false,
-
-      navigatorKey: GlobalKey<NavigatorState>(),
-
-      // ENTRY
-      home: const AuthGate(),
-
+      theme: ThemeData(
+        scaffoldBackgroundColor: const Color(0xFF0A0A0F),
+        colorScheme: ColorScheme.dark(
+          primary: const Color(0xFF8B5CF6),
+          surface: const Color(0xFF12121F),
+        ),
+        fontFamily: 'Inter',
+      ),
+      initialRoute: '/',
       routes: {
-        // AUTH
-        "/register": (context) => const RegisterScreen(),
+        // ── ROOT
+        '/': (ctx) => const AuthGate(),
+        '/register': (ctx) => const RegisterScreen(),
 
-        // STUDENT
-        "/student": (context) => const StudentHome(),
-        "/student/volunteering": (context) => const VolunteeringFeedScreen(),
-        "/student/volunteering/accepted": (context) =>
-            const AcceptedVolunteeringScreen(),
-        "/student/activities": (context) => const StudentActivitiesScreen(),
-        "/student/profile": (context) =>
-            const PlaceholderScreen(title: "Profile"),
-        "/student/certificates": (context) =>
-            const PlaceholderScreen(title: "Certificates"),
+        // ── STUDENT
+        // ── STUDENT
+        '/student': (ctx) => const StudentHome(),
+        '/student/volunteering': (ctx) => const VolunteeringFeedScreen(),
+        '/student/activities': (ctx) => const StudentActivitiesScreen(),
+        '/student/my-progress': (ctx) => const StudentMyProgressScreen(),
+        '/student/profile': (ctx) => const StudentProfileScreen(),
+        '/student/certificates': (ctx) => const StudentCertificatesScreen(),
+        '/student/recommendations': (ctx) =>
+            const StudentRecommendationScreen(),
 
-        // FACULTY
-        // FACULTY
-        "/faculty": (context) => const FacultyHome(),
+        '/student/settings': (ctx) => const _Placeholder(title: 'Settings'),
 
-        "/faculty/create": (context) => const FacultyCreateActivityScreen(),
-
-        "/faculty/volunteering/create": (context) =>
+        // ── FACULTY
+        '/faculty': (ctx) => const FacultyHome(),
+        '/faculty/create': (ctx) => const FacultyCreateActivityScreen(),
+        '/faculty/volunteering/create': (ctx) =>
             const FacultyCreateVolunteeringScreen(),
+        '/faculty/verify': (ctx) => const FacultyVerifyScreen(),
+        '/faculty/analytics': (ctx) => const FacultyAnalyticsScreen(),
+        '/faculty/profile': (ctx) => const FacultyProfileScreen(),
+        '/faculty/manage': (ctx) => const FacultyManageScreen(),
+        '/faculty/manage/detail': (ctx) => const FacultyManageDetailScreen(),
 
-        "/faculty/verify": (context) => const FacultyVerifyScreen(),
+        // ── ADMIN
+        // Matches _Sidebar routes in admin_dashboard_screen.dart exactly:
+        // /admin, /admin/users, /admin/activities, /admin/blockchain, /admin/settings
+        '/admin': (ctx) => const AdminDashboardScreen(),
+        '/admin/users': (ctx) => const AdminUsersScreen(),
+        '/admin/activities': (ctx) => const AdminContentScreen(),
+        // mapped to AdminContentScreen
+        '/admin/blockchain': (ctx) =>
+            const AdminLogsScreen(), // mapped to AdminLogsScreen
+        '/admin/settings': (ctx) => const _Placeholder(title: 'Admin Settings'),
 
-        "/faculty/analytics": (context) => const FacultyAnalyticsScreen(),
-
-        "/faculty/profile": (context) =>
-            const PlaceholderScreen(title: "Faculty Profile"),
+        // Legacy routes kept for backward compatibility
+        '/admin/content': (ctx) =>
+            const AdminContentScreen(), // legacy alias        '/admin/logs': (ctx) => const AdminLogsScreen(),
       },
-
-      // SAFETY NET (VERY IMPORTANT)
-      onUnknownRoute: (settings) {
-        return MaterialPageRoute(
-          builder: (_) =>
-              const Scaffold(body: Center(child: Text("Page not found"))),
-        );
-      },
-    );
-  }
-}
-
-/// PLACEHOLDER
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-
-  const PlaceholderScreen({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(
-          "$title Page Coming Soon",
-          style: const TextStyle(fontSize: 18),
+      onUnknownRoute: (settings) => MaterialPageRoute(
+        builder: (_) => const Scaffold(
+          body: Center(
+            child: Text(
+              'Page not found',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
         ),
       ),
     );
   }
+}
+
+class _Placeholder extends StatelessWidget {
+  final String title;
+  const _Placeholder({required this.title});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFF0A0A0F),
+    appBar: AppBar(
+      backgroundColor: const Color(0xFF0F0F1A),
+      title: Text(title, style: const TextStyle(color: Colors.white)),
+      iconTheme: const IconThemeData(color: Colors.white),
+    ),
+    body: Center(
+      child: Text(
+        '$title — Coming Soon',
+        style: const TextStyle(fontSize: 18, color: Color(0xFF6B7280)),
+      ),
+    ),
+  );
 }

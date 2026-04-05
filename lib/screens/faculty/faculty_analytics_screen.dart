@@ -1,8 +1,23 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // faculty_analytics_screen.dart   Route: /faculty/analytics
 //
-// Faculty analytics dashboard with real Firestore stats + fl_chart charts.
-// Add to pubspec.yaml:  fl_chart: ^0.68.0
+// KEY FIX vs previous version:
+//   _TopBar back button — changed from Navigator.pop(context) to:
+//
+//     if (Navigator.canPop(context)) {
+//       Navigator.pop(context);
+//     } else {
+//       Navigator.pushReplacementNamed(context, '/faculty');
+//     }
+//
+//   WHY: Analytics is reached via pushReplacementNamed from the bottom nav.
+//   That means there is no previous route on the stack to pop back to.
+//   Calling Navigator.pop() on an empty stack produces a blank white screen
+//   on Flutter Web. The canPop() guard means:
+//     • If user somehow reached Analytics via pushNamed (e.g. deep-link) → pop works.
+//     • If user reached it via pushReplacementNamed → fall back to /faculty safely.
+//
+// Everything else is identical to the last working version.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:math' as math;
@@ -10,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:collection/collection.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
@@ -30,7 +46,7 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ANALYTICS DATA MODEL
+// DATA MODELS
 // ─────────────────────────────────────────────────────────────────────────────
 class _AnalyticsData {
   final int totalActivities;
@@ -39,14 +55,9 @@ class _AnalyticsData {
   final int totalCreditsIssued;
   final int verifiedCount;
   final int pendingCount;
-
-  // Bar chart: activities + participants per month (last 6 months)
   final List<_MonthPoint> monthlyActivity;
-  // Line chart: credit trend per month
   final List<_MonthPoint> creditTrend;
-  // Donut: activity type distribution
   final Map<String, int> typeDistribution;
-  // Top students
   final List<_StudentStat> topStudents;
 
   const _AnalyticsData({
@@ -98,8 +109,7 @@ class _AnalyticsService {
   static Map<String, dynamic> _safe(DocumentSnapshot doc) =>
       (doc.data() as Map<String, dynamic>?) ?? {};
 
-  static Future<_AnalyticsData> load(String uid, String facultyName) async {
-    // ── Parallel reads ────────────────────────────────────────────────────────
+  static Future<_AnalyticsData> load(String uid) async {
     final results = await Future.wait([
       _db.collection('activities').where('createdBy', isEqualTo: uid).get(),
       _db.collection('volunteering').where('createdBy', isEqualTo: uid).get(),
@@ -117,7 +127,6 @@ class _AnalyticsService {
     final actIds = actSnap.docs.map((d) => d.id).toSet();
     final volIds = volSnap.docs.map((d) => d.id).toSet();
 
-    // ── Participants ──────────────────────────────────────────────────────────
     final studentSet = <String>{};
     int verified = 0;
     int pending = 0;
@@ -125,8 +134,8 @@ class _AnalyticsService {
     for (final doc in enrSnap.docs) {
       final d = _safe(doc);
       if (!actIds.contains((d['activityId'] as String?) ?? '')) continue;
-      final uid2 = (d['userId'] as String?) ?? '';
-      if (uid2.isNotEmpty) studentSet.add(uid2);
+      final u = (d['userId'] as String?) ?? '';
+      if (u.isNotEmpty) studentSet.add(u);
       final s = (d['status'] as String?) ?? '';
       if (s == 'Verified' || s == 'Completed') {
         verified++;
@@ -134,12 +143,11 @@ class _AnalyticsService {
         pending++;
       }
     }
-
     for (final doc in appSnap.docs) {
       final d = _safe(doc);
       if (!volIds.contains((d['volunteeringId'] as String?) ?? '')) continue;
-      final uid2 = (d['userId'] as String?) ?? '';
-      if (uid2.isNotEmpty) studentSet.add(uid2);
+      final u = (d['userId'] as String?) ?? '';
+      if (u.isNotEmpty) studentSet.add(u);
       final s = (d['status'] as String?) ?? '';
       if (s == 'Verified' || s == 'Completed') {
         verified++;
@@ -148,29 +156,25 @@ class _AnalyticsService {
       }
     }
 
-    // ── Credits issued ────────────────────────────────────────────────────────
     int totalCredits = 0;
     for (final doc in actSnap.docs) {
       final d = _safe(doc);
-      final credits = (d['credits'] as int?) ?? 0;
-      final enrolled = (d['enrolled'] as int?) ?? 0;
-      totalCredits += credits * enrolled;
+      totalCredits +=
+          ((d['credits'] as int?) ?? 0) * ((d['enrolled'] as int?) ?? 0);
     }
     for (final doc in volSnap.docs) {
       final d = _safe(doc);
-      final credits = (d['credits'] as int?) ?? 0;
-      final cur = (d['currentParticipants'] as int?) ?? 0;
-      totalCredits += credits * cur;
+      totalCredits +=
+          ((d['credits'] as int?) ?? 0) *
+          ((d['currentParticipants'] as int?) ?? 0);
     }
 
-    // ── Monthly breakdown (last 6 months) ─────────────────────────────────────
     final now = DateTime.now();
-    final months = List.generate(6, (i) {
-      final dt = DateTime(now.year, now.month - 5 + i);
-      return dt;
-    });
-
-    final monthLabels = [
+    final months = List.generate(
+      6,
+      (i) => DateTime(now.year, now.month - 5 + i),
+    );
+    const monthLabels = [
       'Jan',
       'Feb',
       'Mar',
@@ -185,83 +189,67 @@ class _AnalyticsService {
       'Dec',
     ];
 
-    Map<String, double> actPerMonth = {};
-    Map<String, double> partPerMonth = {};
-    Map<String, double> credPerMonth = {};
-
+    final actPerMonth = <String, double>{};
+    final partPerMonth = <String, double>{};
+    final credPerMonth = <String, double>{};
     for (final m in months) {
-      final key = '${m.year}-${m.month}';
-      actPerMonth[key] = 0;
-      partPerMonth[key] = 0;
-      credPerMonth[key] = 0;
+      final k = '${m.year}-${m.month}';
+      actPerMonth[k] = partPerMonth[k] = credPerMonth[k] = 0;
     }
-
     for (final doc in actSnap.docs) {
       final d = _safe(doc);
       final ts = d['createdAt'];
       if (ts is! Timestamp) continue;
-      final dt = ts.toDate();
-      final key = '${dt.year}-${dt.month}';
-      if (!actPerMonth.containsKey(key)) continue;
-      actPerMonth[key] = (actPerMonth[key] ?? 0) + 1;
-      partPerMonth[key] =
-          (partPerMonth[key] ?? 0) + ((d['enrolled'] as int?) ?? 0);
-      final c = (d['credits'] as int?) ?? 0;
-      final e = (d['enrolled'] as int?) ?? 0;
-      credPerMonth[key] = (credPerMonth[key] ?? 0) + (c * e);
+      final k = '${ts.toDate().year}-${ts.toDate().month}';
+      if (!actPerMonth.containsKey(k)) continue;
+      actPerMonth[k] = (actPerMonth[k] ?? 0) + 1;
+      partPerMonth[k] = (partPerMonth[k] ?? 0) + ((d['enrolled'] as int?) ?? 0);
+      credPerMonth[k] =
+          (credPerMonth[k] ?? 0) +
+          ((d['credits'] as int?) ?? 0) * ((d['enrolled'] as int?) ?? 0);
     }
-
     final monthlyActivity = months.map((m) {
-      final key = '${m.year}-${m.month}';
-      final label = monthLabels[m.month - 1];
+      final k = '${m.year}-${m.month}';
       return _MonthPoint(
-        label: label,
-        activities: actPerMonth[key] ?? 0,
-        participants: partPerMonth[key] ?? 0,
-        credits: credPerMonth[key] ?? 0,
+        label: monthLabels[m.month - 1],
+        activities: actPerMonth[k] ?? 0,
+        participants: partPerMonth[k] ?? 0,
+        credits: credPerMonth[k] ?? 0,
       );
     }).toList();
-
     final creditTrend = monthlyActivity
         .map((p) => _MonthPoint(label: p.label, credits: p.credits))
         .toList();
 
-    // ── Type distribution ─────────────────────────────────────────────────────
     final typeDist = <String, int>{};
     for (final doc in actSnap.docs) {
       final t = (_safe(doc)['type'] as String?) ?? 'Other';
       typeDist[t] = (typeDist[t] ?? 0) + 1;
     }
 
-    // ── Top students ──────────────────────────────────────────────────────────
     final creditMap = <String, int>{};
     final actCountMap = <String, int>{};
-
     for (final doc in enrSnap.docs) {
       final d = _safe(doc);
       if (!actIds.contains((d['activityId'] as String?) ?? '')) continue;
       final s = (d['status'] as String?) ?? '';
       if (s != 'Completed' && s != 'Verified') continue;
-      final uid2 = (d['userId'] as String?) ?? '';
-      if (uid2.isEmpty) continue;
-      final actId = (d['activityId'] as String?) ?? '';
-      final actDoc = actSnap.docs.where((a) => a.id == actId).firstOrNull;
+      final u = (d['userId'] as String?) ?? '';
+      if (u.isEmpty) continue;
+      final activityId = (d['activityId'] as String?) ?? '';
+      final actDoc = actSnap.docs.firstWhereOrNull((a) => a.id == activityId);
       final c = actDoc != null ? ((_safe(actDoc)['credits'] as int?) ?? 0) : 0;
-      creditMap[uid2] = (creditMap[uid2] ?? 0) + c;
-      actCountMap[uid2] = (actCountMap[uid2] ?? 0) + 1;
+      creditMap[u] = (creditMap[u] ?? 0) + c;
+      actCountMap[u] = (actCountMap[u] ?? 0) + 1;
     }
-
-    // Resolve names
     final userNameMap = <String, String>{};
     for (final doc in usersSnap.docs) {
       final d = _safe(doc);
-      final name = (d['name'] as String?) ?? (d['email'] as String?) ?? doc.id;
-      userNameMap[doc.id] = name;
+      userNameMap[doc.id] =
+          (d['name'] as String?) ?? (d['email'] as String?) ?? doc.id;
     }
-
     final sorted = creditMap.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-
     final topStudents = sorted
         .take(5)
         .map(
@@ -356,10 +344,26 @@ class _PulsingDotState extends State<_PulsingDot>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TOP BAR
+// TOP BAR — FIXED back-navigation
 // ─────────────────────────────────────────────────────────────────────────────
 class _TopBar extends StatelessWidget {
   const _TopBar();
+
+  // ── THE KEY FIX ─────────────────────────────────────────────────────────────
+  // BEFORE: onTap: () => Navigator.pop(context)
+  //   → crashes with blank white screen when Analytics was reached via
+  //     pushReplacementNamed (nothing to pop to on Flutter Web).
+  //
+  // AFTER: canPop() guard → pop if possible, otherwise pushReplacementNamed.
+  //   → always lands on a valid route no matter how the page was opened.
+  // ────────────────────────────────────────────────────────────────────────────
+  void _goBack(BuildContext context) {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacementNamed(context, '/faculty');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -373,7 +377,7 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => _goBack(context),
             child: Container(
               width: 34,
               height: 34,
@@ -492,8 +496,7 @@ class _Card extends StatelessWidget {
 // STAT CARD
 // ─────────────────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
+  final String label, value;
   final IconData icon;
   final Color iconColor;
   final String? trend;
@@ -580,7 +583,7 @@ class _StatCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BAR CHART — Monthly activities & participants
+// BAR CHART
 // ─────────────────────────────────────────────────────────────────────────────
 class _MonthlyBarChart extends StatelessWidget {
   final List<_MonthPoint> data;
@@ -589,7 +592,6 @@ class _MonthlyBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (data.isEmpty) return const SizedBox(height: 200);
-
     final maxAct = data.map((e) => e.activities).fold(0.0, math.max);
     final maxPart = data.map((e) => e.participants).fold(0.0, math.max);
     final maxY = math.max(maxAct, maxPart / 10).ceilToDouble();
@@ -605,9 +607,8 @@ class _MonthlyBarChart extends StatelessWidget {
             iconColor: _C.primary,
           ),
           const SizedBox(height: 8),
-          // Legend
-          Row(
-            children: const [
+          const Row(
+            children: [
               _LegendDot(color: _C.primary, label: 'Activities'),
               SizedBox(width: 16),
               _LegendDot(color: _C.neonCyan, label: 'Participants ÷10'),
@@ -633,6 +634,7 @@ class _MonthlyBarChart extends StatelessWidget {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
+                      reservedSize: 26,
                       getTitlesWidget: (v, _) {
                         final i = v.toInt();
                         if (i < 0 || i >= data.length) return const SizedBox();
@@ -647,7 +649,6 @@ class _MonthlyBarChart extends StatelessWidget {
                           ),
                         );
                       },
-                      reservedSize: 26,
                     ),
                   ),
                   leftTitles: AxisTitles(
@@ -667,13 +668,14 @@ class _MonthlyBarChart extends StatelessWidget {
                     sideTitles: SideTitles(showTitles: false),
                   ),
                 ),
-                barGroups: List.generate(data.length, (i) {
-                  final d = data[i];
-                  return BarChartGroupData(
+                barGroups: List.generate(
+                  data.length,
+                  (i) => BarChartGroupData(
                     x: i,
+                    barsSpace: 4,
                     barRods: [
                       BarChartRodData(
-                        toY: d.activities,
+                        toY: data[i].activities,
                         color: _C.primary,
                         width: 10,
                         borderRadius: const BorderRadius.vertical(
@@ -681,7 +683,7 @@ class _MonthlyBarChart extends StatelessWidget {
                         ),
                       ),
                       BarChartRodData(
-                        toY: d.participants / 10,
+                        toY: data[i].participants / 10,
                         color: _C.neonCyan,
                         width: 10,
                         borderRadius: const BorderRadius.vertical(
@@ -689,34 +691,31 @@ class _MonthlyBarChart extends StatelessWidget {
                         ),
                       ),
                     ],
-                    barsSpace: 4,
-                  );
-                }),
+                  ),
+                ),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipColor: (_) => _C.card,
                     tooltipRoundedRadius: 8,
                     getTooltipItem: (group, _, rod, rodIndex) {
                       final d = data[group.x.toInt()];
-                      if (rodIndex == 0) {
-                        return BarTooltipItem(
-                          '${d.label}\n${d.activities.toInt()} activities',
-                          const TextStyle(
-                            color: _C.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      } else {
-                        return BarTooltipItem(
-                          '${d.participants.toInt()} participants',
-                          const TextStyle(
-                            color: _C.neonCyan,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }
+                      return rodIndex == 0
+                          ? BarTooltipItem(
+                              '${d.label}\n${d.activities.toInt()} activities',
+                              const TextStyle(
+                                color: _C.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          : BarTooltipItem(
+                              '${d.participants.toInt()} participants',
+                              const TextStyle(
+                                color: _C.neonCyan,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            );
                     },
                   ),
                 ),
@@ -730,7 +729,7 @@ class _MonthlyBarChart extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LINE CHART — Weekly credit trend
+// LINE CHART
 // ─────────────────────────────────────────────────────────────────────────────
 class _CreditTrendChart extends StatelessWidget {
   final List<_MonthPoint> data;
@@ -739,7 +738,6 @@ class _CreditTrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (data.isEmpty) return const SizedBox();
-
     final maxY = data.map((e) => e.credits).fold(0.0, math.max);
 
     return _Card(
@@ -763,7 +761,7 @@ class _CreditTrendChart extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (_) => FlLine(
-                    color: _C.border.withOpacity(0.5),
+                    color: _C.border.withValues(alpha: 0.5),
                     strokeWidth: 0.8,
                     dashArray: [4, 4],
                   ),
@@ -773,6 +771,7 @@ class _CreditTrendChart extends StatelessWidget {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
+                      reservedSize: 26,
                       getTitlesWidget: (v, _) {
                         final i = v.toInt();
                         if (i < 0 || i >= data.length) return const SizedBox();
@@ -787,7 +786,6 @@ class _CreditTrendChart extends StatelessWidget {
                           ),
                         );
                       },
-                      reservedSize: 26,
                     ),
                   ),
                   leftTitles: AxisTitles(
@@ -859,19 +857,17 @@ class _CreditTrendChart extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DONUT CHART — Activity type distribution
+// DONUT CHART
 // ─────────────────────────────────────────────────────────────────────────────
 class _TypeDistributionChart extends StatefulWidget {
   final Map<String, int> data;
   const _TypeDistributionChart({required this.data});
-
   @override
   State<_TypeDistributionChart> createState() => _TypeDistributionChartState();
 }
 
 class _TypeDistributionChartState extends State<_TypeDistributionChart> {
-  int _touchedIndex = -1;
-
+  int _touched = -1;
   static const _colors = [
     _C.primary,
     _C.neonBlue,
@@ -896,7 +892,6 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
         ),
       );
     }
-
     final entries = widget.data.entries.toList();
     final total = entries.fold(0, (s, e) => s + e.value);
 
@@ -921,22 +916,21 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                   child: PieChart(
                     PieChartData(
                       pieTouchData: PieTouchData(
-                        touchCallback: (_, res) {
-                          setState(() {
-                            _touchedIndex =
-                                res?.touchedSection?.touchedSectionIndex ?? -1;
-                          });
-                        },
+                        touchCallback: (_, res) => setState(
+                          () => _touched =
+                              res?.touchedSection?.touchedSectionIndex ?? -1,
+                        ),
                       ),
                       sectionsSpace: 3,
                       centerSpaceRadius: 46,
                       sections: List.generate(entries.length, (i) {
-                        final e = entries[i];
                         final color = _colors[i % _colors.length];
-                        final pct = total > 0 ? (e.value / total * 100) : 0.0;
-                        final touched = i == _touchedIndex;
+                        final pct = total > 0
+                            ? (entries[i].value / total * 100)
+                            : 0.0;
+                        final touched = i == _touched;
                         return PieChartSectionData(
-                          value: e.value.toDouble(),
+                          value: entries[i].value.toDouble(),
                           color: color,
                           radius: touched ? 54 : 46,
                           title: '${pct.round()}%',
@@ -959,7 +953,6 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: List.generate(entries.length, (i) {
-                    final e = entries[i];
                     final color = _colors[i % _colors.length];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -976,7 +969,7 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              e.key,
+                              entries[i].key,
                               style: const TextStyle(
                                 color: _C.muted,
                                 fontSize: 11,
@@ -987,7 +980,7 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${e.value}',
+                            '${entries[i].value}',
                             style: const TextStyle(
                               color: _C.text,
                               fontSize: 11,
@@ -1041,7 +1034,6 @@ class _TopStudentsCard extends StatelessWidget {
           ...students.asMap().entries.map((entry) {
             final i = entry.key;
             final s = entry.value;
-
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(10),
@@ -1130,11 +1122,10 @@ class _TopStudentsCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VERIFICATION STATUS CARD
+// VERIFICATION STATUS
 // ─────────────────────────────────────────────────────────────────────────────
 class _VerificationStatusCard extends StatelessWidget {
-  final int verified;
-  final int pending;
+  final int verified, pending;
   const _VerificationStatusCard({
     required this.verified,
     required this.pending,
@@ -1144,6 +1135,7 @@ class _VerificationStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = verified + pending;
     final rate = total > 0 ? (verified / total * 100).round() : 0;
+    final filPct = total > 0 ? (verified / total).clamp(0.0, 1.0) : 0.0;
 
     return _Card(
       glowColor: _C.neonCyan.withValues(alpha: 0.3),
@@ -1187,34 +1179,28 @@ class _VerificationStatusCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           LayoutBuilder(
-            builder: (ctx, c) {
-              final w = c.maxWidth;
-              final filPct = total > 0
-                  ? (verified / total).clamp(0.0, 1.0)
-                  : 0.0;
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: SizedBox(
-                  width: w,
-                  height: 8,
-                  child: Stack(
-                    children: [
-                      Container(color: _C.secondary),
-                      FractionallySizedBox(
-                        widthFactor: filPct,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [_C.neonGreen, _C.neonCyan],
-                            ),
+            builder: (ctx, c) => ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                width: c.maxWidth,
+                height: 8,
+                child: Stack(
+                  children: [
+                    Container(color: _C.secondary),
+                    FractionallySizedBox(
+                      widthFactor: filPct,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [_C.neonGreen, _C.neonCyan],
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              );
-            },
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -1230,10 +1216,9 @@ class _VerificationStatusCard extends StatelessWidget {
 }
 
 class _VerifyStat extends StatelessWidget {
-  final String label;
+  final String label, suffix;
   final int value;
   final Color color;
-  final String suffix;
   const _VerifyStat({
     required this.label,
     required this.value,
@@ -1276,7 +1261,7 @@ class _VerifyStat extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHARED SMALL HELPERS
+// SHARED HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 class _CardHeader extends StatelessWidget {
   final String title;
@@ -1295,7 +1280,7 @@ class _CardHeader extends StatelessWidget {
         width: 30,
         height: 30,
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: iconColor, size: 15),
@@ -1340,12 +1325,47 @@ class _LegendDot extends StatelessWidget {
   );
 }
 
+class _SummaryRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String text;
+  const _SummaryRow({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, color: color, size: 13),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          text,
+          style: const TextStyle(color: _C.muted, fontSize: 12, height: 1.5),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ],
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 class FacultyAnalyticsScreen extends StatefulWidget {
   const FacultyAnalyticsScreen({super.key});
-
   @override
   State<FacultyAnalyticsScreen> createState() => _FacultyAnalyticsScreenState();
 }
@@ -1357,24 +1377,38 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadAll();
   }
 
-  void _load() {
+  // Uses the same mounted-safe pattern as faculty_home.dart:
+  // 1. Kick off the data fetch synchronously (no async setState).
+  // 2. Fetch display name separately; check mounted before setState.
+  void _loadAll() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _future = Future.value(_empty());
       return;
     }
+
+    // Store future synchronously — no setState needed here because
+    // this is called from initState (before first build) or from
+    // a plain setState wrapper below.
+    _future = _AnalyticsService.load(user.uid);
+
+    // Fetch display name in background — mounted check before setState
     FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((
       doc,
     ) {
-      final d = doc.data() ?? {};
-      final name = (d['name'] as String?) ?? '';
-      if (mounted && name.isNotEmpty) setState(() => _displayName = name);
+      if (!mounted) return;
+      final data = doc.data();
+      final name = (data?['name'] as String?) ?? '';
+      if (name.isNotEmpty) setState(() => _displayName = name);
     });
+  }
 
-    _future = _AnalyticsService.load(user.uid, _displayName);
+  void _refresh() {
+    if (!mounted) return;
+    setState(_loadAll);
   }
 
   _AnalyticsData _empty() => const _AnalyticsData(
@@ -1406,14 +1440,11 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
                 child: FutureBuilder<_AnalyticsData>(
                   future: _future,
                   builder: (context, snap) {
-                    // ── Loading ────────────────────────────────────────────
                     if (snap.connectionState == ConnectionState.waiting) {
                       return const Center(
                         child: CircularProgressIndicator(color: _C.primary),
                       );
                     }
-
-                    // ── Error ──────────────────────────────────────────────
                     if (snap.hasError) {
                       return Center(
                         child: Padding(
@@ -1446,7 +1477,7 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
                               ),
                               const SizedBox(height: 20),
                               GestureDetector(
-                                onTap: () => setState(_load),
+                                onTap: _refresh,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 24,
@@ -1494,7 +1525,6 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ── HEADER ─────────────────────────────────────
                           Text(
                             _displayName.isNotEmpty
                                 ? 'Dr. $_displayName\'s Analytics'
@@ -1514,10 +1544,9 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-
                           const SizedBox(height: 20),
 
-                          // ── STAT GRID ────────────────────────────────────
+                          // Stat grid
                           LayoutBuilder(
                             builder: (ctx, c) {
                               const gap = 10.0;
@@ -1577,26 +1606,18 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
                               );
                             },
                           ),
-
                           const SizedBox(height: 6),
 
-                          // ── VERIFICATION OVERVIEW ─────────────────────────
                           _VerificationStatusCard(
                             verified: data.verifiedCount,
                             pending: data.pendingCount,
                           ),
-
-                          // ── BAR CHART ─────────────────────────────────────
                           _MonthlyBarChart(data: data.monthlyActivity),
-
-                          // ── DONUT + TOP STUDENTS (stacked on mobile) ───────
                           _TypeDistributionChart(data: data.typeDistribution),
                           _TopStudentsCard(students: data.topStudents),
-
-                          // ── LINE CHART ────────────────────────────────────
                           _CreditTrendChart(data: data.creditTrend),
 
-                          // ── SUMMARY ───────────────────────────────────────
+                          // Summary
                           _Card(
                             glowColor: _C.primary.withValues(alpha: 0.2),
                             child: Column(
@@ -1651,40 +1672,4 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
       ),
     );
   }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String text;
-  const _SummaryRow({
-    required this.icon,
-    required this.color,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        width: 24,
-        height: 24,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(icon, color: color, size: 13),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Text(
-          text,
-          style: const TextStyle(color: _C.muted, fontSize: 12, height: 1.5),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    ],
-  );
 }

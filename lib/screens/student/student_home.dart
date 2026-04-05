@@ -1,573 +1,481 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// student_home.dart — Production-ready, 100% real Firestore data
+// student_home.dart   Route: /student
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
-class AppColors {
-  static const bg = Color(0xFF080D19);
+class _C {
   static const card = Color(0xFF111827);
   static const primary = Color(0xFF8B5CF6);
   static const neonBlue = Color(0xFF3B82F6);
   static const neonCyan = Color(0xFF06B6D4);
   static const neonGreen = Color(0xFF10B981);
+  static const amber = Color(0xFFF59E0B);
   static const text = Color(0xFFEFF3F8);
   static const muted = Color(0xFF7E8A9A);
   static const border = Color(0xFF1F2937);
-  static const yellow = Color(0xFFFBBF24);
-  static const secondary = Color(0xFF1A2235);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD DATA MODEL
+// DATA MODELS
 // ─────────────────────────────────────────────────────────────────────────────
-class _DashboardData {
+class _DashData {
   final int totalCredits;
-  final int volunteeringCount;
-  final int volunteeringCredits;
+  final int enrollmentsCount;
+  final int applicationsCount;
   final int certificatesCount;
-  final int activitiesCount;
   final int rank;
-  final List<_ActivityRow> recentActivities;
+  final List<_EnrolledRow> recentEnrollments;
   final List<_CertRow> recentCerts;
 
-  const _DashboardData({
+  const _DashData({
     required this.totalCredits,
-    required this.volunteeringCount,
-    required this.volunteeringCredits,
+    required this.enrollmentsCount,
+    required this.applicationsCount,
     required this.certificatesCount,
-    required this.activitiesCount,
     required this.rank,
-    required this.recentActivities,
+    required this.recentEnrollments,
     required this.recentCerts,
   });
 }
 
-class _ActivityRow {
-  final String title;
+class _EnrolledRow {
+  final String title, date, status, type;
   final int credits;
-  final String date;
-  final String status;
-  final String type;
-  const _ActivityRow({
+  const _EnrolledRow({
     required this.title,
-    required this.credits,
     required this.date,
     required this.status,
     required this.type,
+    required this.credits,
   });
 }
 
 class _CertRow {
-  final String title;
-  final String issuer;
-  final String date;
-  final String txHash;
+  final String title, date, type;
+  final int credits;
   const _CertRow({
     required this.title,
-    required this.issuer,
     required this.date,
-    required this.txHash,
+    required this.type,
+    required this.credits,
   });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FIRESTORE SERVICE — all reads in one place, no nested futures in UI
+// FIRESTORE SERVICE
+// Correct joins:
+//   credits       → users/{uid}.credits
+//   activity feed → enrollments(userId) → activities(activityId)
+//   vol feed      → applications(userId) → volunteering(volunteeringId)
+//   cert feed     → certificates(userId) → activities|volunteering(itemId)
 // ─────────────────────────────────────────────────────────────────────────────
 class _HomeService {
   static final _db = FirebaseFirestore.instance;
-
-  /// Safe map accessor from a DocumentSnapshot.
-  static Map<String, dynamic> _data(DocumentSnapshot doc) =>
+  static Map<String, dynamic> _safe(DocumentSnapshot doc) =>
       (doc.data() as Map<String, dynamic>?) ?? {};
 
-  static Future<_DashboardData> load(String uid) async {
-    // ── 1. Parallel fetches that don't depend on each other ─────────────────
-    final results = await Future.wait([
-      // [0] applications for this user
-      _db.collection('applications').where('userId', isEqualTo: uid).get(),
-      // [1] certificates count
-      _db.collection('certificates').where('userId', isEqualTo: uid).get(),
-      // [2] activities (for feed + count)
-      _db
-          .collection('activities')
-          .where('userId', isEqualTo: uid)
-          .orderBy('date', descending: true)
-          .limit(5)
-          .get(),
-      // [3] total activities count
-      _db.collection('activities').where('userId', isEqualTo: uid).get(),
-      // [4] certificates feed (limit 3)
-      _db
-          .collection('certificates')
-          .where('userId', isEqualTo: uid)
-          .orderBy('date', descending: true)
-          .limit(3)
-          .get(),
-      // [5] all users for rank (lightweight — just ids & credits)
-      _db.collection('users').get(),
-    ]);
-
-    final appSnap = results[0] as QuerySnapshot;
-    final certSnap = results[1] as QuerySnapshot;
-    final actFeedSnap = results[2] as QuerySnapshot;
-    final actAllSnap = results[3] as QuerySnapshot;
-    final certFeedSnap = results[4] as QuerySnapshot;
-    final usersSnap = results[5] as QuerySnapshot;
-
-    // ── 2. Volunteering join — batch fetch volunteering docs ─────────────────
-    final volIds = appSnap.docs
-        .map((d) => (_data(d)['volunteeringId'] as String?) ?? '')
-        .where((id) => id.isNotEmpty)
-        .toSet()
-        .toList();
-
-    final Map<String, Map<String, dynamic>> volMap = {};
-    const batchSize = 30;
-    for (int i = 0; i < volIds.length; i += batchSize) {
-      final chunk = volIds.sublist(i, (i + batchSize).clamp(0, volIds.length));
+  static Future<Map<String, Map<String, dynamic>>> _batchIds(
+    String col,
+    List<String> ids,
+  ) async {
+    final result = <String, Map<String, dynamic>>{};
+    for (int i = 0; i < ids.length; i += 30) {
+      final chunk = ids.sublist(i, (i + 30).clamp(0, ids.length));
       final snap = await _db
-          .collection('volunteering')
+          .collection(col)
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
       for (final doc in snap.docs) {
-        volMap[doc.id] = _data(doc);
+        result[doc.id] = _safe(doc);
       }
     }
+    return result;
+  }
 
-    // ── 3. Compute volunteering credits (status == "Completed") ─────────────
-    int volunteeringCredits = 0;
-    for (final appDoc in appSnap.docs) {
-      final ad = _data(appDoc);
-      final vid = (ad['volunteeringId'] as String?) ?? '';
-      final vol = volMap[vid];
-      if (vol == null) continue;
-      if ((ad['status'] as String?)?.toLowerCase() == 'completed') {
-        volunteeringCredits += (vol['credits'] as int?) ?? 0;
-      }
-    }
+  static Future<_DashData> load(String uid) async {
+    // ── Step 1: primary parallel fetches ─────────────────────────────────────
+    final results = await Future.wait([
+      _db
+          .collection('enrollments')
+          .where('userId', isEqualTo: uid)
+          .get(), // [0]
+      _db
+          .collection('applications')
+          .where('userId', isEqualTo: uid)
+          .get(), // [1]
+      _db
+          .collection('certificates')
+          .where('userId', isEqualTo: uid)
+          .get(), // [2]
+      _db.collection('users').doc(uid).get(), // [3]
+      _db.collection('users').get(), // [4] rank
+    ]);
+    final enrSnap = results[0] as QuerySnapshot;
+    final appSnap = results[1] as QuerySnapshot;
+    final certSnap = results[2] as QuerySnapshot;
+    final userDoc = results[3] as DocumentSnapshot;
+    final usersSnap = results[4] as QuerySnapshot;
 
-    // ── 4. Compute activity credits (status == "verified") ───────────────────
-    int activityCredits = 0;
-    for (final doc in actAllSnap.docs) {
-      final d = _data(doc);
-      if ((d['status'] as String?)?.toLowerCase() == 'verified') {
-        activityCredits += (d['credits'] as int?) ?? 0;
-      }
-    }
+    // Credits come directly from the user doc — no manual calculation
+    final userCredits = (_safe(userDoc)['credits'] as int?) ?? 0;
 
-    final totalCredits = volunteeringCredits + activityCredits;
+    // ── Step 2: collect IDs ───────────────────────────────────────────────────
+    final actIds = enrSnap.docs
+        .map((d) => (_safe(d)['activityId'] as String?) ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
+    final volIds = appSnap.docs
+        .map((d) => (_safe(d)['volunteeringId'] as String?) ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
+    final certItemIds = certSnap.docs
+        .map((d) => (_safe(d)['itemId'] as String?) ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
 
-    // ── 5. Rank — count users with more credits than current user ────────────
+    // ── Step 3: batch-join in parallel ────────────────────────────────────────
+    final joins = await Future.wait([
+      actIds.isNotEmpty
+          ? _batchIds('activities', actIds)
+          : Future.value(<String, Map<String, dynamic>>{}),
+      volIds.isNotEmpty
+          ? _batchIds('volunteering', volIds)
+          : Future.value(<String, Map<String, dynamic>>{}),
+      certItemIds.isNotEmpty
+          ? _batchIds('activities', certItemIds)
+          : Future.value(<String, Map<String, dynamic>>{}),
+      certItemIds.isNotEmpty
+          ? _batchIds('volunteering', certItemIds)
+          : Future.value(<String, Map<String, dynamic>>{}),
+    ]);
+    final actMap = joins[0];
+    final volMap = joins[1];
+    final certActMap = joins[2];
+    final certVolMap = joins[3];
+
+    // ── Step 4: rank ──────────────────────────────────────────────────────────
     int rank = 1;
     for (final doc in usersSnap.docs) {
       if (doc.id == uid) continue;
-      final d = _data(doc);
-      if (((d['totalCredits'] as int?) ?? 0) > totalCredits) rank++;
+      if (((_safe(doc)['credits'] as int?) ?? 0) > userCredits) rank++;
     }
 
-    // ── 6. Activity feed rows ────────────────────────────────────────────────
-    final recentActivities = actFeedSnap.docs.map((doc) {
-      final d = _data(doc);
-      return _ActivityRow(
-        title: (d['title'] as String?) ?? '',
-        credits: (d['credits'] as int?) ?? 0,
-        date: (d['date'] as String?) ?? '',
-        status: (d['status'] as String?) ?? 'pending',
-        type: (d['type'] as String?) ?? '',
+    // ── Step 5: enrollment feed (activities) — latest 5 ──────────────────────
+    int cmpTs(Timestamp? a, Timestamp? b) {
+      if (a == null && b == null) return 0;
+      if (a == null) return 1;
+      if (b == null) return -1;
+      return b.compareTo(a);
+    }
+
+    final sortedEnr = [...enrSnap.docs]
+      ..sort(
+        (a, b) => cmpTs(
+          _safe(a)['appliedAt'] as Timestamp?,
+          _safe(b)['appliedAt'] as Timestamp?,
+        ),
+      );
+    final enrRows = sortedEnr.take(5).map((doc) {
+      final d = _safe(doc);
+      final aid = (d['activityId'] as String?) ?? '';
+      final act = actMap[aid] ?? {};
+      return _EnrolledRow(
+        title: (act['title'] as String?) ?? aid,
+        date: (act['date'] as String?) ?? '',
+        status: (d['status'] as String?) ?? '',
+        type: (act['type'] as String?) ?? 'Activity',
+        credits: (act['credits'] as int?) ?? 0,
       );
     }).toList();
 
-    // ── 7. Certificate feed rows ─────────────────────────────────────────────
-    final recentCerts = certFeedSnap.docs.map((doc) {
-      final d = _data(doc);
+    // Volunteering applications — latest 3
+    final sortedApp = [...appSnap.docs]
+      ..sort(
+        (a, b) => cmpTs(
+          _safe(a)['appliedAt'] as Timestamp?,
+          _safe(b)['appliedAt'] as Timestamp?,
+        ),
+      );
+    final appRows = sortedApp.take(3).map((doc) {
+      final d = _safe(doc);
+      final vid = (d['volunteeringId'] as String?) ?? '';
+      final vol = volMap[vid] ?? {};
+      return _EnrolledRow(
+        title: (vol['title'] as String?) ?? vid,
+        date: (vol['date'] as String?) ?? '',
+        status: (d['status'] as String?) ?? '',
+        type: (vol['category'] as String?) ?? 'Volunteering',
+        credits: (vol['credits'] as int?) ?? 0,
+      );
+    }).toList();
+
+    final recentEnrollments = [...enrRows, ...appRows];
+
+    // ── Step 6: cert feed — latest 3 ─────────────────────────────────────────
+    final sortedCerts = [...certSnap.docs]
+      ..sort(
+        (a, b) => cmpTs(
+          _safe(a)['createdAt'] as Timestamp?,
+          _safe(b)['createdAt'] as Timestamp?,
+        ),
+      );
+
+    final recentCerts = sortedCerts.take(3).map((doc) {
+      final d = _safe(doc);
+      final itemId = (d['itemId'] as String?) ?? '';
+      final type = (d['type'] as String?) ?? 'activity';
+      final item = type == 'activity'
+          ? (certActMap[itemId] ?? {})
+          : (certVolMap[itemId] ?? {});
+      final ts = d['createdAt'];
+      String date = '';
+      if (ts is Timestamp) {
+        final dt = ts.toDate();
+        date =
+            '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+      }
       return _CertRow(
-        title: (d['title'] as String?) ?? '',
-        issuer: (d['issuer'] as String?) ?? '',
-        date: (d['date'] as String?) ?? '',
-        txHash: (d['txHash'] as String?) ?? '0x---',
+        title: (item['title'] as String?) ?? itemId,
+        date: date,
+        type: type,
+        credits: (d['credits'] as int?) ?? 0,
       );
     }).toList();
 
-    return _DashboardData(
-      totalCredits: totalCredits,
-      volunteeringCount: appSnap.docs.length,
-      volunteeringCredits: volunteeringCredits,
+    return _DashData(
+      totalCredits: userCredits,
+      enrollmentsCount: enrSnap.docs.length,
+      applicationsCount: appSnap.docs.length,
       certificatesCount: certSnap.docs.length,
-      activitiesCount: actAllSnap.docs.length,
       rank: rank,
-      recentActivities: recentActivities,
+      recentEnrollments: recentEnrollments,
       recentCerts: recentCerts,
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRID PAINTER
+// SHARED WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF1F2937).withOpacity(0.3)
-      ..strokeWidth = 0.8;
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    }
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter _) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GLASS CARD
-// ─────────────────────────────────────────────────────────────────────────────
-class GlassCard extends StatelessWidget {
+class _GlassCard extends StatelessWidget {
   final Widget child;
-  final EdgeInsets? padding;
   final Color? glowColor;
   final VoidCallback? onTap;
-
-  const GlassCard({
-    super.key,
-    required this.child,
-    this.padding,
-    this.glowColor,
-    this.onTap,
-  });
+  const _GlassCard({required this.child, this.glowColor, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: padding ?? const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.card.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 1),
-          boxShadow: glowColor != null
-              ? [
-                  BoxShadow(
-                    color: glowColor!.withOpacity(0.18),
-                    blurRadius: 18,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : [],
-        ),
-        child: child,
+    final box = Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _C.card.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _C.border),
+        boxShadow: glowColor != null
+            ? [
+                BoxShadow(
+                  color: glowColor!.withValues(alpha: 0.18),
+                  blurRadius: 18,
+                ),
+              ]
+            : [],
       ),
+      child: child,
     );
+    return onTap == null ? box : GestureDetector(onTap: onTap, child: box);
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STAT CARD
-// ─────────────────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
+  final String label, value;
   final IconData icon;
-  final String? trend;
-  final bool trendUp;
-
+  final String? sub;
   const _StatCard({
     required this.label,
     required this.value,
     required this.icon,
-    this.trend,
-    this.trendUp = true,
+    this.sub,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.card.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  label.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: _C.card.withValues(alpha: 0.7),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _C.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: _C.muted,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1,
                 ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: AppColors.primary, size: 15),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.text,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-          if (trend != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              '${trendUp ? '↑' : '↓'} $trend',
-              style: TextStyle(
-                color: trendUp ? AppColors.neonCyan : Colors.redAccent,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 4),
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: _C.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              child: Icon(icon, color: _C.primary, size: 15),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STAT GRID — 2-column responsive, data-driven
-// ─────────────────────────────────────────────────────────────────────────────
-class _StatGrid extends StatelessWidget {
-  final _DashboardData data;
-  const _StatGrid({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      (
-        label: 'Total Credits',
-        value: '${data.totalCredits}',
-        icon: Icons.star_rounded,
-        trend: 'from activities',
-        trendUp: true,
-      ),
-      (
-        label: 'Volunteering',
-        value: '${data.volunteeringCount}',
-        icon: Icons.eco_rounded,
-        trend: '${data.volunteeringCredits} credits',
-        trendUp: true,
-      ),
-      (
-        label: 'Certificates',
-        value: '${data.certificatesCount}',
-        icon: Icons.workspace_premium_rounded,
-        trend: 'earned',
-        trendUp: true,
-      ),
-      (
-        label: 'Activities',
-        value: '${data.activitiesCount}',
-        icon: Icons.menu_book_rounded,
-        trend: 'total',
-        trendUp: true,
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const gap = 10.0;
-        final cardWidth = (constraints.maxWidth - gap) / 2;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: items
-              .map(
-                (e) => SizedBox(
-                  width: cardWidth,
-                  child: _StatCard(
-                    label: e.label,
-                    value: e.value,
-                    icon: e.icon,
-                    trend: e.trend,
-                    trendUp: e.trendUp,
-                  ),
-                ),
-              )
-              .toList(),
-        );
-      },
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BLOCKCHAIN BADGE
-// ─────────────────────────────────────────────────────────────────────────────
-class BlockchainBadge extends StatelessWidget {
-  final String status;
-  const BlockchainBadge({super.key, required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final isVerified = status == 'verified';
-    final isPending = status == 'pending';
-
-    final Color badgeColor;
-    final Color borderColor;
-    final IconData badgeIcon;
-    final String badgeLabel;
-
-    if (isVerified) {
-      badgeColor = AppColors.neonCyan;
-      borderColor = AppColors.neonCyan.withOpacity(0.4);
-      badgeIcon = Icons.check_circle_rounded;
-      badgeLabel = 'Verified';
-    } else if (isPending) {
-      badgeColor = AppColors.yellow;
-      borderColor = AppColors.yellow.withOpacity(0.4);
-      badgeIcon = Icons.access_time_rounded;
-      badgeLabel = 'Pending';
-    } else {
-      badgeColor = AppColors.muted;
-      borderColor = AppColors.border;
-      badgeIcon = Icons.shield_outlined;
-      badgeLabel = 'Not Verified';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(badgeIcon, size: 11, color: badgeColor),
-          const SizedBox(width: 4),
+        ),
+        const SizedBox(height: 8),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: _C.text,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        if (sub != null) ...[
+          const SizedBox(height: 4),
           Text(
-            badgeLabel,
-            style: TextStyle(
-              color: badgeColor,
+            sub!,
+            style: const TextStyle(
+              color: _C.neonCyan,
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
+      ],
+    ),
+  );
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge({required this.status});
+
+  Color _color() {
+    switch (status.toLowerCase()) {
+      case 'verified':
+        return _C.neonCyan;
+      case 'completed':
+        return _C.neonGreen;
+      case 'approved':
+        return _C.amber;
+      default:
+        return _C.primary;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _color();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        status.isNotEmpty ? status : 'Pending',
+        style: TextStyle(color: c, fontSize: 9, fontWeight: FontWeight.w700),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GRADIENT BUTTON
-// ─────────────────────────────────────────────────────────────────────────────
-class GradientButton extends StatelessWidget {
+class _ActionBtn extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  final List<Color> colors;
   final bool outlined;
-
-  const GradientButton({
-    super.key,
+  const _ActionBtn({
     required this.label,
     required this.icon,
     required this.onTap,
-    this.colors = const [AppColors.primary, AppColors.neonBlue],
     this.outlined = false,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 44,
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          gradient: outlined ? null : LinearGradient(colors: colors),
-          borderRadius: BorderRadius.circular(12),
-          border: outlined
-              ? Border.all(color: AppColors.primary, width: 1.4)
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: outlined ? AppColors.primary : Colors.white,
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: outlined ? AppColors.primary : Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      height: 44,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        gradient: outlined
+            ? null
+            : const LinearGradient(colors: [_C.primary, _C.neonBlue]),
+        borderRadius: BorderRadius.circular(12),
+        border: outlined ? Border.all(color: _C.primary, width: 1.4) : null,
       ),
-    );
-  }
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: outlined ? _C.primary : Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: outlined ? _C.primary : Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CREDIT PROGRESS BAR
-// ─────────────────────────────────────────────────────────────────────────────
-class _CreditProgressBar extends StatelessWidget {
-  final int earned;
-  final int total;
-  const _CreditProgressBar({required this.earned, required this.total});
+class _ProgressBar extends StatelessWidget {
+  final int earned, total;
+  const _ProgressBar({required this.earned, required this.total});
 
   @override
   Widget build(BuildContext context) {
-    final progress = total > 0 ? (earned / total).clamp(0.0, 1.0) : 0.0;
-    return GlassCard(
-      glowColor: AppColors.primary,
+    final pct = total > 0 ? (earned / total).clamp(0.0, 1.0) : 0.0;
+    return _GlassCard(
+      glowColor: _C.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -578,50 +486,48 @@ class _CreditProgressBar extends StatelessWidget {
               const Text(
                 'Credit Progress',
                 style: TextStyle(
-                  color: AppColors.text,
+                  color: _C.text,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
               Text(
-                '$earned / $total credits',
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                '$earned / $total',
+                style: const TextStyle(color: _C.muted, fontSize: 12),
               ),
             ],
           ),
           const SizedBox(height: 12),
           LayoutBuilder(
-            builder: (ctx, c) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: c.maxWidth,
-                  height: 10,
-                  child: Stack(
-                    children: [
-                      Container(color: AppColors.border),
-                      FractionallySizedBox(
-                        widthFactor: progress,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [AppColors.primary, AppColors.neonBlue],
-                            ),
+            builder: (_, c) => ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                height: 10,
+                width: c.maxWidth,
+                child: Stack(
+                  children: [
+                    Container(color: _C.border),
+                    FractionallySizedBox(
+                      widthFactor: pct,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [_C.primary, _C.neonBlue],
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              );
-            },
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             earned >= total
                 ? 'Graduation requirement met! 🎉'
-                : '${total - earned} more credits needed for graduation',
-            style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                : '${total - earned} more credits needed',
+            style: const TextStyle(color: _C.muted, fontSize: 11),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -631,32 +537,27 @@ class _CreditProgressBar extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ACTIVITY TILE
-// ─────────────────────────────────────────────────────────────────────────────
-class _ActivityTile extends StatelessWidget {
-  final _ActivityRow item;
-  const _ActivityTile({required this.item});
+class _EnrollmentTile extends StatelessWidget {
+  final _EnrolledRow item;
+  const _EnrollmentTile({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final isVerified = item.status == 'verified';
-    return GlassCard(
+    final isVol = item.type.toLowerCase().contains('vol');
+    final ic = isVol ? _C.neonGreen : _C.primary;
+    return _GlassCard(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: ic.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              isVerified
-                  ? Icons.check_circle_rounded
-                  : Icons.access_time_rounded,
-              color: isVerified ? AppColors.neonCyan : AppColors.yellow,
+              isVol ? Icons.eco_rounded : Icons.menu_book_rounded,
+              color: ic,
               size: 20,
             ),
           ),
@@ -669,7 +570,7 @@ class _ActivityTile extends StatelessWidget {
                 Text(
                   item.title,
                   style: const TextStyle(
-                    color: AppColors.text,
+                    color: _C.text,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
@@ -679,7 +580,7 @@ class _ActivityTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   '${item.type} · ${item.date}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                  style: const TextStyle(color: _C.muted, fontSize: 11),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -694,13 +595,13 @@ class _ActivityTile extends StatelessWidget {
               Text(
                 '+${item.credits}',
                 style: const TextStyle(
-                  color: AppColors.primary,
+                  color: _C.primary,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 6),
-              BlockchainBadge(status: item.status),
+              _StatusBadge(status: item.status),
             ],
           ),
         ],
@@ -709,298 +610,110 @@ class _ActivityTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CERTIFICATE TILE
-// ─────────────────────────────────────────────────────────────────────────────
 class _CertTile extends StatelessWidget {
   final _CertRow item;
   const _CertTile({required this.item});
 
   @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      glowColor: AppColors.neonCyan,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.workspace_premium_rounded,
-                color: AppColors.neonCyan,
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item.title,
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+  Widget build(BuildContext context) => _GlassCard(
+    glowColor: _C.neonCyan,
+    child: Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: _C.neonCyan.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${item.issuer} · ${item.date}',
-            style: const TextStyle(color: AppColors.muted, fontSize: 11),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          child: const Icon(
+            Icons.workspace_premium_rounded,
+            color: _C.neonCyan,
+            size: 20,
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.txHash,
-                  style: const TextStyle(
-                    color: AppColors.neonCyan,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.4)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Verify',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 11,
-                      color: AppColors.primary,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// VOLUNTEERING SUMMARY CARD — dynamic data
-// ─────────────────────────────────────────────────────────────────────────────
-class _VolunteeringCard extends StatelessWidget {
-  final int credits;
-  final int count;
-  final VoidCallback onTap;
-  const _VolunteeringCard({
-    required this.credits,
-    required this.count,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      onTap: onTap,
-      glowColor: AppColors.neonGreen,
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.neonGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.eco_rounded,
-              color: AppColors.neonGreen,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '🌱 Volunteering Credits Earned',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  count > 0
-                      ? '$credits credits from $count volunteering activit${count == 1 ? 'y' : 'ies'}'
-                      : 'No volunteering activities yet',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '$credits',
+                item.title,
                 style: const TextStyle(
-                  color: AppColors.neonGreen,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
+                  color: _C.text,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const Text(
-                'credits',
-                style: TextStyle(color: AppColors.muted, fontSize: 9),
+              const SizedBox(height: 3),
+              Text(
+                '${item.type} · ${item.date}',
+                style: const TextStyle(color: _C.muted, fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BLOCKCHAIN RECORDS CARD
-// ─────────────────────────────────────────────────────────────────────────────
-class _BlockchainRecordsCard extends StatelessWidget {
-  final int onChain;
-  final int verified;
-  const _BlockchainRecordsCard({required this.onChain, required this.verified});
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.neonCyan.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.shield_rounded,
-              color: AppColors.neonCyan,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '🔗 Blockchain Records',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Your on-chain academic footprint',
-                  style: TextStyle(color: AppColors.muted, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          _StatPair(
-            value: '$onChain',
-            label: 'On-Chain',
-            color: AppColors.text,
-          ),
-          const SizedBox(width: 16),
-          _StatPair(
-            value: '$verified',
-            label: 'Verified',
-            color: AppColors.neonCyan,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatPair extends StatelessWidget {
-  final String value;
-  final String label;
-  final Color color;
-  const _StatPair({
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
         ),
-        Text(
-          label,
-          style: const TextStyle(color: AppColors.muted, fontSize: 9),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '+${item.credits}',
+              style: const TextStyle(
+                color: _C.amber,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _C.neonCyan.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _C.neonCyan.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.verified_rounded, size: 9, color: _C.neonCyan),
+                  SizedBox(width: 3),
+                  Text(
+                    'Issued',
+                    style: TextStyle(
+                      color: _C.neonCyan,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
-    );
-  }
+    ),
+  );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DID CARD
-// ─────────────────────────────────────────────────────────────────────────────
 class _DIDCard extends StatelessWidget {
-  final String did;
-  const _DIDCard({required this.did});
+  final String uid;
+  const _DIDCard({required this.uid});
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      glowColor: AppColors.primary,
+    final short = uid.length >= 12
+        ? '${uid.substring(0, 8)}...${uid.substring(uid.length - 4)}'
+        : uid;
+    final did = uid.isNotEmpty ? 'did:ethr:0x$short' : 'did:ethr:0x---';
+    return _GlassCard(
+      glowColor: _C.primary,
       child: Row(
         children: [
           Container(
@@ -1008,7 +721,7 @@ class _DIDCard extends StatelessWidget {
             height: 48,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.neonCyan],
+                colors: [_C.primary, _C.neonCyan],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1034,7 +747,7 @@ class _DIDCard extends StatelessWidget {
                 const Text(
                   'Decentralized Identity',
                   style: TextStyle(
-                    color: AppColors.text,
+                    color: _C.text,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
@@ -1045,7 +758,7 @@ class _DIDCard extends StatelessWidget {
                 Text(
                   did,
                   style: const TextStyle(
-                    color: AppColors.muted,
+                    color: _C.muted,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -1056,133 +769,22 @@ class _DIDCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          const BlockchainBadge(status: 'verified'),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PULSING DOT
-// ─────────────────────────────────────────────────────────────────────────────
-class _PulsingDot extends StatefulWidget {
-  const _PulsingDot();
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.3, end: 1.0).animate(_ctrl);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-    opacity: _anim,
-    child: Container(
-      width: 7,
-      height: 7,
-      decoration: const BoxDecoration(
-        color: AppColors.neonCyan,
-        shape: BoxShape.circle,
-      ),
-    ),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TOP APP BAR
-// ─────────────────────────────────────────────────────────────────────────────
-class _StudentTopBar extends StatelessWidget {
-  final String userName;
-  const _StudentTopBar({required this.userName});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: MediaQuery.of(context).padding.top + 8,
-        bottom: 10,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.card.withOpacity(0.7),
-        border: const Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        children: [
-          // Logo
           Container(
-            width: 32,
-            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.neonBlue],
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.shield_rounded,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'UniTrack',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                'Student Portal',
-                style: TextStyle(color: AppColors.muted, fontSize: 10),
-              ),
-            ],
-          ),
-          const Spacer(),
-          // Network badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.neonCyan.withOpacity(0.1),
+              color: _C.neonCyan.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.neonCyan.withOpacity(0.3)),
+              border: Border.all(color: _C.neonCyan.withValues(alpha: 0.4)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _PulsingDot(),
-                SizedBox(width: 6),
+                Icon(Icons.verified_rounded, size: 11, color: _C.neonCyan),
+                SizedBox(width: 4),
                 Text(
-                  'Connected ✔',
+                  'Verified',
                   style: TextStyle(
-                    color: AppColors.neonCyan,
+                    color: _C.neonCyan,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1190,518 +792,424 @@ class _StudentTopBar extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          // Bell
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppColors.border.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.notifications_rounded,
-                  color: AppColors.muted,
-                  size: 17,
-                ),
-              ),
-              Positioned(
-                top: -2,
-                right: -2,
-                child: Container(
-                  width: 15,
-                  height: 15,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '3',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          // Wallet
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.border.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: AppColors.neonCyan,
-                  size: 13,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  '0x7f...3a2b',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Avatar
-          Container(
-            width: 30,
-            height: 30,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.neonBlue],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BOTTOM NAV — uses pushReplacementNamed
-// ─────────────────────────────────────────────────────────────────────────────
-class _NavItem {
-  final String label;
-  final IconData icon;
-  final String route;
-  final bool highlight;
-  const _NavItem({
-    required this.label,
-    required this.icon,
-    required this.route,
-    this.highlight = false,
-  });
-}
-
-const _navItems = [
-  _NavItem(label: 'Home', icon: Icons.dashboard_rounded, route: '/student'),
-  _NavItem(
-    label: 'Volunteer',
-    icon: Icons.eco_rounded,
-    route: '/student/volunteering',
-    highlight: true,
-  ),
-  _NavItem(
-    label: 'Activities',
-    icon: Icons.menu_book_rounded,
-    route: '/student/activities',
-  ),
-  _NavItem(
-    label: 'Portfolio',
-    icon: Icons.person_rounded,
-    route: '/student/profile',
-  ),
-  _NavItem(
-    label: 'Wallet',
-    icon: Icons.workspace_premium_rounded,
-    route: '/student/certificates',
-  ),
-];
-
-class _StudentBottomNav extends StatelessWidget {
-  final String currentRoute;
-  const _StudentBottomNav({required this.currentRoute});
+class _EmptySection extends StatelessWidget {
+  final String message;
+  const _EmptySection({required this.message});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.card,
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 58,
-          child: Row(
-            children: _navItems.map((item) {
-              final isActive = currentRoute == item.route;
-              final Color iconColor = item.highlight
-                  ? (isActive
-                        ? AppColors.neonGreen
-                        : AppColors.neonGreen.withOpacity(0.5))
-                  : (isActive ? AppColors.primary : AppColors.muted);
-
-              return Expanded(
-                child: GestureDetector(
-                  // Use pushReplacementNamed to avoid stacking nav pages
-                  onTap: () =>
-                      Navigator.pushReplacementNamed(context, item.route),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(item.icon, size: 21, color: iconColor),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          color: iconColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+  Widget build(BuildContext context) => _GlassCard(
+    child: Row(
+      children: [
+        const Icon(Icons.inbox_rounded, color: _C.muted, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(color: _C.muted, fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EMPTY SECTION STATE
-// ─────────────────────────────────────────────────────────────────────────────
-class _EmptySectionState extends StatelessWidget {
-  final String message;
-  const _EmptySectionState({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Row(
-        children: [
-          const Icon(Icons.inbox_rounded, color: AppColors.muted, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN — STUDENT HOME
+// SCREEN
+// No Scaffold — StudentDashboardLayout owns Scaffold + scroll
 // ─────────────────────────────────────────────────────────────────────────────
 class StudentHome extends StatefulWidget {
   const StudentHome({super.key});
-
   @override
   State<StudentHome> createState() => _StudentHomeState();
 }
 
 class _StudentHomeState extends State<StudentHome> {
-  late Future<_DashboardData> _dashFuture;
+  Future<_DashData> _future = Future.value(
+    const _DashData(
+      totalCredits: 0,
+      enrollmentsCount: 0,
+      applicationsCount: 0,
+      certificatesCount: 0,
+      rank: 0,
+      recentEnrollments: [],
+      recentCerts: [],
+    ),
+  );
   String _userName = '';
+  String _uid = '';
 
   @override
   void initState() {
     super.initState();
-    _init();
+    Future.microtask(_init);
   }
 
   void _init() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    // Load user name
-    FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((
-      doc,
-    ) {
-      final d = doc.data() ?? {};
-      final name = (d['name'] as String?) ?? '';
-      if (mounted && name.isNotEmpty) setState(() => _userName = name);
+    if (user == null || !mounted) return;
+    _uid = user.uid;
+
+    FirebaseFirestore.instance.collection('users').doc(_uid).get().then((doc) {
+      if (!mounted) return;
+      final name = ((doc.data() ?? {})['name'] as String?) ?? '';
+      if (name.isNotEmpty) setState(() => _userName = name);
     });
-    // Load dashboard data
-    _dashFuture = _HomeService.load(user.uid);
+
+    final f = _HomeService.load(_uid);
+    _future = f;
+    setState(() {});
   }
 
-  void _refresh() => setState(_init);
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      extendBody: true,
-      bottomNavigationBar: const _StudentBottomNav(currentRoute: '/student'),
-      body: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-          Column(
-            children: [
-              _StudentTopBar(userName: _userName),
-              Expanded(
-                child: FutureBuilder<_DashboardData>(
-                  future: _dashFuture,
-                  builder: (context, snap) {
-                    // ── Loading ──────────────────────────────────────────────
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
+  Widget build(BuildContext context) => StudentDashboardLayout(
+    currentRoute: '/student',
+    userName: _userName,
+    child: FutureBuilder<_DashData>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 80),
+            child: Center(child: CircularProgressIndicator(color: _C.primary)),
+          );
+        }
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Failed to load dashboard',
+                    style: TextStyle(
+                      color: _C.text,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    snap.error.toString(),
+                    style: const TextStyle(color: _C.muted, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: _init,
+                    child: Container(
+                      height: 44,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_C.primary, _C.neonBlue],
                         ),
-                      );
-                    }
-
-                    // ── Error ────────────────────────────────────────────────
-                    if (snap.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.error_outline_rounded,
-                                color: Colors.redAccent,
-                                size: 40,
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Failed to load dashboard',
-                                style: TextStyle(
-                                  color: AppColors.text,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                snap.error.toString(),
-                                style: const TextStyle(
-                                  color: AppColors.muted,
-                                  fontSize: 12,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 20),
-                              GradientButton(
-                                label: 'Retry',
-                                icon: Icons.refresh_rounded,
-                                onTap: _refresh,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    // ── Data ─────────────────────────────────────────────────
-                    final data = snap.data!;
-                    const requiredCredits = 60;
-
-                    return SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        16,
-                        16,
-                        MediaQuery.of(context).padding.bottom + 72,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // ── HEADER ────────────────────────────────────────
+                          Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
                           Text(
-                            'Welcome back, ${_userName.isNotEmpty ? _userName : 'Student'} 👋',
-                            style: const TextStyle(
-                              color: AppColors.text,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Track your academic activities and blockchain-verified credits',
+                            'Retry',
                             style: TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
                             ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // ── ACTION BUTTONS ────────────────────────────────
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GradientButton(
-                                  label: 'Apply Volunteering',
-                                  icon: Icons.eco_rounded,
-                                  onTap: () => Navigator.pushNamed(
-                                    context,
-                                    '/student/volunteering',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: GradientButton(
-                                  label: 'Enroll Activity',
-                                  icon: Icons.flash_on_rounded,
-                                  onTap: () => Navigator.pushNamed(
-                                    context,
-                                    '/student/activities',
-                                  ),
-                                  outlined: true,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // ── STAT GRID ─────────────────────────────────────
-                          _StatGrid(data: data),
-
-                          const SizedBox(height: 10),
-
-                          // Rank — full width
-                          _StatCard(
-                            label: 'Rank',
-                            value: '#${data.rank}',
-                            icon: Icons.trending_up_rounded,
-                            trend: 'among all students',
-                            trendUp: true,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // ── CREDIT PROGRESS ───────────────────────────────
-                          _CreditProgressBar(
-                            earned: data.totalCredits,
-                            total: requiredCredits,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // ── RECENT ACTIVITIES ─────────────────────────────
-                          const Text(
-                            'Recent Activities',
-                            style: TextStyle(
-                              color: AppColors.text,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          data.recentActivities.isEmpty
-                              ? const _EmptySectionState(
-                                  message:
-                                      'No activities yet. Enroll to earn credits!',
-                                )
-                              : Column(
-                                  children: data.recentActivities
-                                      .map((a) => _ActivityTile(item: a))
-                                      .toList(),
-                                ),
-
-                          const SizedBox(height: 20),
-
-                          // ── CERTIFICATES ──────────────────────────────────
-                          const Text(
-                            'Digital Certificates',
-                            style: TextStyle(
-                              color: AppColors.text,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          data.recentCerts.isEmpty
-                              ? const _EmptySectionState(
-                                  message:
-                                      'No certificates yet. Complete activities to earn them!',
-                                )
-                              : Column(
-                                  children: data.recentCerts
-                                      .map((c) => _CertTile(item: c))
-                                      .toList(),
-                                ),
-
-                          if (data.recentCerts.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            GradientButton(
-                              label: 'View All Certificates',
-                              icon: Icons.arrow_forward_rounded,
-                              onTap: () => Navigator.pushNamed(
-                                context,
-                                '/student/certificates',
-                              ),
-                              outlined: true,
-                            ),
-                          ],
-
-                          const SizedBox(height: 20),
-
-                          // ── VOLUNTEERING SUMMARY ──────────────────────────
-                          _VolunteeringCard(
-                            credits: data.volunteeringCredits,
-                            count: data.volunteeringCount,
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              '/student/volunteering',
-                            ),
-                          ),
-
-                          // ── BLOCKCHAIN RECORDS ────────────────────────────
-                          _BlockchainRecordsCard(
-                            onChain:
-                                data.activitiesCount + data.volunteeringCount,
-                            verified: data.certificatesCount,
-                          ),
-
-                          // ── DID BADGE ─────────────────────────────────────
-                          _DIDCard(
-                            did: FirebaseAuth.instance.currentUser?.uid != null
-                                ? 'did:ethr:0x${FirebaseAuth.instance.currentUser!.uid.substring(0, 8)}...${FirebaseAuth.instance.currentUser!.uid.substring(FirebaseAuth.instance.currentUser!.uid.length - 4)}'
-                                : 'did:ethr:0x---',
                           ),
                         ],
                       ),
-                    );
-                  },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final data = snap.data!;
+        const required = 60;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Greeting
+            Text(
+              'Welcome back, ${_userName.isNotEmpty ? _userName : 'Student'} 👋',
+              style: const TextStyle(
+                color: _C.text,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Track your activities and blockchain-verified credentials',
+              style: TextStyle(color: _C.muted, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
+
+            // Quick actions
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionBtn(
+                    label: 'Apply Volunteering',
+                    icon: Icons.eco_rounded,
+                    onTap: () => Navigator.pushReplacementNamed(
+                      context,
+                      '/student/volunteering',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionBtn(
+                    label: 'Enroll Activity',
+                    icon: Icons.flash_on_rounded,
+                    outlined: true,
+                    onTap: () => Navigator.pushReplacementNamed(
+                      context,
+                      '/student/activities',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Stat grid (2-column)
+            LayoutBuilder(
+              builder: (_, c) {
+                const gap = 10.0;
+                final w = (c.maxWidth - gap) / 2;
+                final stats = [
+                  (
+                    label: 'Total Credits',
+                    value: '${data.totalCredits}',
+                    icon: Icons.star_rounded,
+                    sub: '↑ from profile',
+                  ),
+                  (
+                    label: 'Activities',
+                    value: '${data.enrollmentsCount}',
+                    icon: Icons.menu_book_rounded,
+                    sub: 'enrolled',
+                  ),
+                  (
+                    label: 'Volunteering',
+                    value: '${data.applicationsCount}',
+                    icon: Icons.eco_rounded,
+                    sub: 'applied',
+                  ),
+                  (
+                    label: 'Certificates',
+                    value: '${data.certificatesCount}',
+                    icon: Icons.workspace_premium_rounded,
+                    sub: 'earned',
+                  ),
+                ];
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: stats
+                      .map(
+                        (s) => SizedBox(
+                          width: w,
+                          child: _StatCard(
+                            label: s.label,
+                            value: s.value,
+                            icon: s.icon,
+                            sub: s.sub,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // Rank full-width
+            _StatCard(
+              label: 'Rank',
+              value: '#${data.rank}',
+              icon: Icons.trending_up_rounded,
+              sub: 'among all students',
+            ),
+            const SizedBox(height: 20),
+
+            // Credit progress
+            _ProgressBar(earned: data.totalCredits, total: required),
+            const SizedBox(height: 20),
+
+            // Recent activity feed
+            const Text(
+              'Recent Activities',
+              style: TextStyle(
+                color: _C.text,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 10),
+            data.recentEnrollments.isEmpty
+                ? const _EmptySection(
+                    message: 'No activities yet. Enroll to earn credits!',
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: data.recentEnrollments
+                        .map((e) => _EnrollmentTile(item: e))
+                        .toList(),
+                  ),
+            const SizedBox(height: 20),
+
+            // Digital certificates
+            const Text(
+              'Digital Certificates',
+              style: TextStyle(
+                color: _C.text,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 10),
+            data.recentCerts.isEmpty
+                ? const _EmptySection(
+                    message:
+                        'No certificates yet. Complete activities to earn them!',
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: data.recentCerts
+                        .map((c) => _CertTile(item: c))
+                        .toList(),
+                  ),
+
+            if (data.recentCerts.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              _ActionBtn(
+                label: 'View All Certificates',
+                icon: Icons.arrow_forward_rounded,
+                outlined: true,
+                onTap: () => Navigator.pushReplacementNamed(
+                  context,
+                  '/student/certificates',
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 20),
+
+            // Blockchain summary
+            _GlassCard(
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _C.neonCyan.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.shield_rounded,
+                      color: _C.neonCyan,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '🔗 Blockchain Records',
+                          style: TextStyle(
+                            color: _C.text,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'Your on-chain academic footprint',
+                          style: TextStyle(color: _C.muted, fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${data.enrollmentsCount + data.applicationsCount}',
+                        style: const TextStyle(
+                          color: _C.text,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                      const Text(
+                        'On-Chain',
+                        style: TextStyle(color: _C.muted, fontSize: 9),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${data.certificatesCount}',
+                        style: const TextStyle(
+                          color: _C.neonCyan,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                      const Text(
+                        'Certified',
+                        style: TextStyle(color: _C.muted, fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // DID badge
+            _DIDCard(uid: _uid),
+          ],
+        );
+      },
+    ),
+  );
 }

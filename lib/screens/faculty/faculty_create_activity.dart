@@ -1,10 +1,17 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // faculty_create_activity.dart   Route: /faculty/create
+//
+// FIX: Removed the inner Scaffold + Stack + Column(Expanded(SingleChildScrollView))
+//      that was causing the black screen. The page now returns
+//      FacultyDashboardLayout(child: Column(mainAxisSize.min, [...])) directly.
+//      FacultyDashboardLayout owns the Scaffold and the scroll view.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'faculty_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
@@ -21,27 +28,6 @@ class _C {
   static const muted = Color(0xFF7E8A9A);
   static const border = Color(0xFF1F2937);
   static const secondary = Color(0xFF1A2235);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GRID PAINTER
-// ─────────────────────────────────────────────────────────────────────────────
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF1F2937).withValues(alpha: 0.3)
-      ..strokeWidth = 0.8;
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    }
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter _) => false;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +76,6 @@ class _TF extends StatelessWidget {
   final String hint;
   final int maxLines;
   final TextInputType? keyboardType;
-
   const _TF({
     required this.controller,
     required this.hint,
@@ -130,7 +115,6 @@ class _Dropdown extends StatelessWidget {
   final String value;
   final List<String> items;
   final ValueChanged<String?> onChanged;
-
   const _Dropdown({
     required this.value,
     required this.items,
@@ -171,13 +155,11 @@ class _Dropdown extends StatelessWidget {
 }
 
 class _Toggle extends StatelessWidget {
-  final String label;
-  final String subtitle;
+  final String label, subtitle;
   final IconData icon;
   final Color iconColor;
   final bool value;
   final ValueChanged<bool> onChanged;
-
   const _Toggle({
     required this.label,
     required this.subtitle,
@@ -201,7 +183,7 @@ class _Toggle extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.1),
+            color: iconColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: iconColor, size: 18),
@@ -273,7 +255,7 @@ class _SectionCard extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 14),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: _C.card.withValues(alpha: 0.75),
+      color: _C.card.withOpacity(0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
     ),
@@ -289,7 +271,7 @@ Widget _sectionHeader(String title, IconData icon, Color color) => Padding(
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 16),
@@ -311,93 +293,6 @@ Widget _sectionHeader(String title, IconData icon, Color color) => Padding(
   ),
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TOP BAR
-// ─────────────────────────────────────────────────────────────────────────────
-class _TopBar extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color iconColor;
-  const _TopBar({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, topPad + 10, 16, 12),
-      decoration: BoxDecoration(
-        color: _C.card.withValues(alpha: 0.7),
-        border: const Border(bottom: BorderSide(color: _C.border)),
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 34,
-              height: 34,
-              margin: const EdgeInsets.only(right: 10),
-              decoration: BoxDecoration(
-                color: _C.secondary,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _C.border),
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: _C.muted,
-                size: 15,
-              ),
-            ),
-          ),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: _C.text,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: _C.muted, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PUBLISH BUTTON
-// ─────────────────────────────────────────────────────────────────────────────
 class _PublishButton extends StatelessWidget {
   final String label;
   final bool loading;
@@ -464,7 +359,6 @@ class _PublishButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class FacultyCreateActivityScreen extends StatefulWidget {
   const FacultyCreateActivityScreen({super.key});
-
   @override
   State<FacultyCreateActivityScreen> createState() =>
       _FacultyCreateActivityScreenState();
@@ -472,7 +366,6 @@ class FacultyCreateActivityScreen extends StatefulWidget {
 
 class _FacultyCreateActivityScreenState
     extends State<FacultyCreateActivityScreen> {
-  // Controllers
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _deptCtrl = TextEditingController();
@@ -480,7 +373,6 @@ class _FacultyCreateActivityScreenState
   final _capacityCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
 
-  // State
   String _type = 'Workshop';
   bool _blockchainCert = true;
   bool _loading = false;
@@ -556,7 +448,7 @@ class _FacultyCreateActivityScreenState
               fontWeight: FontWeight.w600,
             ),
           ),
-          backgroundColor: color.withValues(alpha: 0.9),
+          backgroundColor: color.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -568,7 +460,6 @@ class _FacultyCreateActivityScreenState
     final title = _titleCtrl.text.trim();
     final desc = _descCtrl.text.trim();
     final dept = _deptCtrl.text.trim();
-
     if (title.isEmpty) {
       _snack('Activity title is required', _C.amber);
       return;
@@ -592,13 +483,12 @@ class _FacultyCreateActivityScreenState
 
     final credits = int.tryParse(_creditsCtrl.text.trim()) ?? 0;
     final capacity = int.tryParse(_capacityCtrl.text.trim()) ?? 0;
-
     if (credits <= 0) {
-      _snack('Credits must be greater than 0', _C.amber);
+      _snack('Credits must be > 0', _C.amber);
       return;
     }
     if (capacity <= 0) {
-      _snack('Capacity must be greater than 0', _C.amber);
+      _snack('Capacity must be > 0', _C.amber);
       return;
     }
 
@@ -609,21 +499,17 @@ class _FacultyCreateActivityScreenState
     }
 
     setState(() => _loading = true);
-
     try {
-      // Fetch faculty display name
       String facultyName = user.email ?? user.uid;
       try {
         final uDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
-        final data = uDoc.data();
-        final name = (data?['name'] as String?) ?? '';
+        final name = (uDoc.data()?['name'] as String?) ?? '';
         if (name.isNotEmpty) facultyName = name;
       } catch (_) {}
 
-      // Duration string
       String duration = '';
       if (_endDate != null && _startDate != null) {
         final diff = _endDate!.difference(_startDate!).inDays + 1;
@@ -652,12 +538,9 @@ class _FacultyCreateActivityScreenState
 
       if (!mounted) return;
       setState(() => _loading = false);
-      _snack('Activity published successfully! 🚀', _C.neonGreen);
+      _snack('Activity published! 🚀', _C.neonGreen);
       if (!mounted) return;
-
-      Navigator.of(
-        context,
-      ).pushNamedAndRemoveUntil('/faculty', (route) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil('/faculty', (r) => false);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -678,7 +561,7 @@ class _FacultyCreateActivityScreenState
         color: _C.secondary,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: date != null ? _C.primary.withValues(alpha: 0.5) : _C.border,
+          color: date != null ? _C.primary.withOpacity(0.5) : _C.border,
         ),
       ),
       child: Row(
@@ -705,214 +588,194 @@ class _FacultyCreateActivityScreenState
     ),
   );
 
+  // ── build ────────────────────────────────────────────────────────────────
+  // The child passed to FacultyDashboardLayout is a plain Column(min).
+  // No Scaffold, no Stack, no Expanded, no scroll view here.
   @override
-  Widget build(BuildContext context) {
-    final botPad = MediaQuery.of(context).padding.bottom;
-    return Scaffold(
-      backgroundColor: _C.bg,
-      body: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-          Column(
+  Widget build(BuildContext context) => FacultyDashboardLayout(
+    currentRoute: '/faculty/create',
+    userName: '',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min, // ← critical
+      children: [
+        // Page heading (layout header already shows title, but a sub-heading is fine)
+        const Text(
+          'Create Academic Activity',
+          style: TextStyle(
+            color: _C.text,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Define a new activity for students to enroll in',
+          style: TextStyle(color: _C.muted, fontSize: 12),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 20),
+
+        // ── Basic info ──────────────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _TopBar(
-                title: 'Create Academic Activity',
-                subtitle: 'Define a new activity for students to enroll in',
-                icon: Icons.menu_book_rounded,
-                iconColor: _C.primary,
+              _sectionHeader(
+                'Basic Information',
+                Icons.info_outline_rounded,
+                _C.primary,
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, botPad + 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              const _FieldLabel('Activity Title', required: true),
+              _TF(controller: _titleCtrl, hint: 'e.g. AI Workshop 2025'),
+              const SizedBox(height: 14),
+              const _FieldLabel('Activity Type', required: true),
+              _Dropdown(
+                value: _type,
+                items: _types,
+                onChanged: (v) => setState(() => _type = v!),
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Description', required: true),
+              _TF(
+                controller: _descCtrl,
+                hint:
+                    'Describe the activity, learning outcomes and requirements...',
+                maxLines: 4,
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Department'),
+              _TF(controller: _deptCtrl, hint: 'e.g. Computer Science'),
+            ],
+          ),
+        ),
+
+        // ── Schedule & capacity ──────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sectionHeader(
+                'Schedule & Capacity',
+                Icons.event_rounded,
+                _C.neonCyan,
+              ),
+              LayoutBuilder(
+                builder: (ctx, c) {
+                  const gap = 12.0;
+                  final w = (c.maxWidth - gap) / 2;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: 12,
                     children: [
-                      // ── BASIC INFO ─────────────────────────────────────
-                      _SectionCard(
+                      SizedBox(
+                        width: w,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _sectionHeader(
-                              'Basic Information',
-                              Icons.info_outline_rounded,
-                              _C.primary,
-                            ),
-                            const _FieldLabel('Activity Title', required: true),
+                            const _FieldLabel('Credit Points', required: true),
                             _TF(
-                              controller: _titleCtrl,
-                              hint: 'e.g. AI Workshop 2025',
-                            ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Activity Type', required: true),
-                            _Dropdown(
-                              value: _type,
-                              items: _types,
-                              onChanged: (v) => setState(() => _type = v!),
-                            ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Description', required: true),
-                            _TF(
-                              controller: _descCtrl,
-                              hint:
-                                  'Describe the activity, learning outcomes and requirements...',
-                              maxLines: 4,
-                            ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Department'),
-                            _TF(
-                              controller: _deptCtrl,
-                              hint: 'e.g. Computer Science',
+                              controller: _creditsCtrl,
+                              hint: 'e.g. 3',
+                              keyboardType: TextInputType.number,
                             ),
                           ],
                         ),
                       ),
-
-                      // ── CAPACITY & SCHEDULE ────────────────────────────
-                      _SectionCard(
+                      SizedBox(
+                        width: w,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _sectionHeader(
-                              'Schedule & Capacity',
-                              Icons.event_rounded,
-                              _C.neonCyan,
-                            ),
-                            LayoutBuilder(
-                              builder: (ctx, c) {
-                                const gap = 12.0;
-                                final w = (c.maxWidth - gap) / 2;
-                                return Wrap(
-                                  spacing: gap,
-                                  runSpacing: 12,
-                                  children: [
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel(
-                                            'Credit Points',
-                                            required: true,
-                                          ),
-                                          _TF(
-                                            controller: _creditsCtrl,
-                                            hint: 'e.g. 3',
-                                            keyboardType: TextInputType.number,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel(
-                                            'Max Capacity',
-                                            required: true,
-                                          ),
-                                          _TF(
-                                            controller: _capacityCtrl,
-                                            hint: 'e.g. 50',
-                                            keyboardType: TextInputType.number,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel(
-                                            'Start Date',
-                                            required: true,
-                                          ),
-                                          _dateButton(
-                                            label: 'Pick start date',
-                                            date: _startDate,
-                                            isStart: true,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel('End Date'),
-                                          _dateButton(
-                                            label: 'Pick end date',
-                                            date: _endDate,
-                                            isStart: false,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Venue / Location'),
+                            const _FieldLabel('Max Capacity', required: true),
                             _TF(
-                              controller: _locationCtrl,
-                              hint: 'e.g. Auditorium Block A, Room 301',
+                              controller: _capacityCtrl,
+                              hint: 'e.g. 50',
+                              keyboardType: TextInputType.number,
                             ),
                           ],
                         ),
                       ),
-
-                      // ── BLOCKCHAIN ─────────────────────────────────────
-                      _SectionCard(
+                      SizedBox(
+                        width: w,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _sectionHeader(
-                              'Verification',
-                              Icons.verified_rounded,
-                              _C.neonGreen,
-                            ),
-                            _Toggle(
-                              label: 'Blockchain Certificate',
-                              subtitle:
-                                  'Issue verifiable NFT credential on completion',
-                              icon: Icons.shield_rounded,
-                              iconColor: _C.neonCyan,
-                              value: _blockchainCert,
-                              onChanged: (v) =>
-                                  setState(() => _blockchainCert = v),
+                            const _FieldLabel('Start Date', required: true),
+                            _dateButton(
+                              label: 'Pick start date',
+                              date: _startDate,
+                              isStart: true,
                             ),
                           ],
                         ),
                       ),
-
-                      // ── PUBLISH ────────────────────────────────────────
-                      _PublishButton(
-                        label: 'Publish Activity',
-                        loading: _loading,
-                        onTap: _publish,
+                      SizedBox(
+                        width: w,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const _FieldLabel('End Date'),
+                            _dateButton(
+                              label: 'Pick end date',
+                              date: _endDate,
+                              isStart: false,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                ),
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Venue / Location'),
+              _TF(
+                controller: _locationCtrl,
+                hint: 'e.g. Auditorium Block A, Room 301',
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+
+        // ── Verification ─────────────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sectionHeader(
+                'Verification',
+                Icons.verified_rounded,
+                _C.neonGreen,
+              ),
+              _Toggle(
+                label: 'Blockchain Certificate',
+                subtitle: 'Issue verifiable NFT credential on completion',
+                icon: Icons.shield_rounded,
+                iconColor: _C.neonCyan,
+                value: _blockchainCert,
+                onChanged: (v) => setState(() => _blockchainCert = v),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Publish ───────────────────────────────────────────────────────────
+        _PublishButton(
+          label: 'Publish Activity',
+          loading: _loading,
+          onTap: _publish,
+        ),
+        const SizedBox(height: 8),
+      ],
+    ),
+  );
 }

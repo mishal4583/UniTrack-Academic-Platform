@@ -1,10 +1,17 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // faculty_create_volunteering.dart   Route: /faculty/volunteering/create
+//
+// FIX: Was using Scaffold + Stack + Column(Expanded(SingleChildScrollView))
+//      → caused white screen (same "unbounded height" crash as create_activity).
+//      Now uses FacultyDashboardLayout(child: Column(mainAxisSize: min)).
+//      No Scaffold, no Stack, no Expanded, no scroll view in this file.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'faculty_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
@@ -24,26 +31,7 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRID PAINTER
-// ─────────────────────────────────────────────────────────────────────────────
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF1F2937).withOpacity(0.3)
-      ..strokeWidth = 0.8;
-    for (double x = 0; x < size.width; x += 40)
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    for (double y = 0; y < size.height; y += 40)
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter _) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SHARED FORM WIDGETS  (self-contained — no import from create_activity)
+// FORM WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 class _FieldLabel extends StatelessWidget {
   final String text;
@@ -88,7 +76,6 @@ class _TF extends StatelessWidget {
   final String hint;
   final int maxLines;
   final TextInputType? keyboardType;
-
   const _TF({
     required this.controller,
     required this.hint,
@@ -128,7 +115,6 @@ class _Dropdown extends StatelessWidget {
   final String value;
   final List<String> items;
   final ValueChanged<String?> onChanged;
-
   const _Dropdown({
     required this.value,
     required this.items,
@@ -217,13 +203,11 @@ Widget _sectionHeader(String title, IconData icon, Color color) => Padding(
 );
 
 class _Toggle extends StatelessWidget {
-  final String label;
-  final String subtitle;
+  final String label, subtitle;
   final IconData icon;
   final Color iconColor;
   final bool value;
   final ValueChanged<bool> onChanged;
-
   const _Toggle({
     required this.label,
     required this.subtitle,
@@ -366,86 +350,10 @@ class _PublishButton extends StatelessWidget {
   );
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar();
-
-  @override
-  Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, topPad + 10, 16, 12),
-      decoration: BoxDecoration(
-        color: _C.card.withOpacity(0.7),
-        border: const Border(bottom: BorderSide(color: _C.border)),
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 34,
-              height: 34,
-              margin: const EdgeInsets.only(right: 10),
-              decoration: BoxDecoration(
-                color: _C.secondary,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _C.border),
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: _C.muted,
-                size: 15,
-              ),
-            ),
-          ),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: _C.neonGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.eco_rounded, color: _C.neonGreen, size: 18),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Create Volunteering',
-                  style: TextStyle(
-                    color: _C.text,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  'Define a new volunteering opportunity for students',
-                  style: TextStyle(color: _C.muted, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// VERIFICATION TYPE SELECTOR
-// ─────────────────────────────────────────────────────────────────────────────
 class _VerifyTypeSelector extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onChanged;
   static const _types = ['Faculty Approval', 'QR Check-in'];
-
   const _VerifyTypeSelector({required this.selected, required this.onChanged});
 
   @override
@@ -494,7 +402,6 @@ class _VerifyTypeSelector extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class FacultyCreateVolunteeringScreen extends StatefulWidget {
   const FacultyCreateVolunteeringScreen({super.key});
-
   @override
   State<FacultyCreateVolunteeringScreen> createState() =>
       _FacultyCreateVolunteeringScreenState();
@@ -502,7 +409,6 @@ class FacultyCreateVolunteeringScreen extends StatefulWidget {
 
 class _FacultyCreateVolunteeringScreenState
     extends State<FacultyCreateVolunteeringScreen> {
-  // Controllers
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _skillsCtrl = TextEditingController();
@@ -511,7 +417,6 @@ class _FacultyCreateVolunteeringScreenState
   final _durCtrl = TextEditingController();
   final _maxCtrl = TextEditingController();
 
-  // State
   String _category = 'Academic Support';
   String _verifyType = 'Faculty Approval';
   bool _blockchainCert = true;
@@ -535,8 +440,9 @@ class _FacultyCreateVolunteeringScreenState
       _creditCtrl,
       _durCtrl,
       _maxCtrl,
-    ])
+    ]) {
       c.dispose();
+    }
     super.dispose();
   }
 
@@ -558,10 +464,25 @@ class _FacultyCreateVolunteeringScreenState
         ),
       );
 
+  String _monthName(int m) => [
+    '',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][m];
+
   Future<void> _publish() async {
     final title = _titleCtrl.text.trim();
     final desc = _descCtrl.text.trim();
-
     if (title.isEmpty) {
       _snack('Title is required', _C.amber);
       return;
@@ -581,13 +502,12 @@ class _FacultyCreateVolunteeringScreenState
 
     final credits = int.tryParse(_creditCtrl.text.trim()) ?? 0;
     final maxP = int.tryParse(_maxCtrl.text.trim()) ?? 0;
-
     if (credits <= 0) {
-      _snack('Credits must be greater than 0', _C.amber);
+      _snack('Credits must be > 0', _C.amber);
       return;
     }
     if (maxP <= 0) {
-      _snack('Max participants must be greater than 0', _C.amber);
+      _snack('Max participants must be > 0', _C.amber);
       return;
     }
 
@@ -605,8 +525,6 @@ class _FacultyCreateVolunteeringScreenState
           .map((s) => s.trim())
           .where((s) => s.isNotEmpty)
           .toList();
-
-      // Approximate current date string
       final now = DateTime.now();
       final dateStr = '${_monthName(now.month)} ${now.year}';
 
@@ -632,7 +550,9 @@ class _FacultyCreateVolunteeringScreenState
 
       if (!mounted) return;
       setState(() => _loading = false);
-      _snack('Volunteering published successfully! 🌱', _C.neonGreen);
+      _snack('Volunteering published! 🌱', _C.neonGreen);
+      if (!mounted) return;
+      // Use pushReplacementNamed — never pop() from a peer page
       Navigator.pushReplacementNamed(context, '/faculty');
     } catch (e) {
       if (!mounted) return;
@@ -641,218 +561,196 @@ class _FacultyCreateVolunteeringScreenState
     }
   }
 
-  String _monthName(int m) => [
-    '',
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ][m];
-
+  // ── build ────────────────────────────────────────────────────────────────────
+  // Returns FacultyDashboardLayout(child: Column(mainAxisSize.min)).
+  // NO Scaffold, NO Stack, NO Expanded, NO SingleChildScrollView here.
+  // The layout owns all of those.
   @override
-  Widget build(BuildContext context) {
-    final botPad = MediaQuery.of(context).padding.bottom;
-    return Scaffold(
-      backgroundColor: _C.bg,
-      body: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-          Column(
+  Widget build(BuildContext context) => FacultyDashboardLayout(
+    currentRoute: '/faculty/volunteering/create',
+    userName: '',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min, // ← critical: no unbounded height
+      children: [
+        // Page heading
+        const Text(
+          'Create Volunteering',
+          style: TextStyle(
+            color: _C.text,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Define a new volunteering opportunity for students',
+          style: TextStyle(color: _C.muted, fontSize: 12),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 20),
+
+        // ── Basic info ────────────────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const _TopBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, botPad + 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── BASIC INFO ──────────────────────────────────────
-                      _SectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _sectionHeader(
-                              'Basic Information',
-                              Icons.eco_rounded,
-                              _C.neonGreen,
-                            ),
-                            const _FieldLabel('Title', required: true),
-                            _TF(
-                              controller: _titleCtrl,
-                              hint: 'e.g. Campus Green Initiative Coordinator',
-                            ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Organization / Dept.'),
-                            _TF(controller: _orgCtrl, hint: 'e.g. Eco Club'),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Category', required: true),
-                            _Dropdown(
-                              value: _category,
-                              items: _categories,
-                              onChanged: (v) => setState(() => _category = v!),
-                            ),
-                            const SizedBox(height: 14),
-                            const _FieldLabel('Description', required: true),
-                            _TF(
-                              controller: _descCtrl,
-                              hint:
-                                  'Describe the volunteering role and responsibilities...',
-                              maxLines: 3,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ── DETAILS ─────────────────────────────────────────
-                      _SectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _sectionHeader(
-                              'Details & Capacity',
-                              Icons.tune_rounded,
-                              _C.neonCyan,
-                            ),
-                            LayoutBuilder(
-                              builder: (ctx, c) {
-                                const gap = 12.0;
-                                final w = (c.maxWidth - gap) / 2;
-                                return Wrap(
-                                  spacing: gap,
-                                  runSpacing: 12,
-                                  children: [
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel(
-                                            'Credit Points',
-                                            required: true,
-                                          ),
-                                          _TF(
-                                            controller: _creditCtrl,
-                                            hint: 'e.g. 3',
-                                            keyboardType: TextInputType.number,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel(
-                                            'Max Participants',
-                                            required: true,
-                                          ),
-                                          _TF(
-                                            controller: _maxCtrl,
-                                            hint: 'e.g. 15',
-                                            keyboardType: TextInputType.number,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel('Duration'),
-                                          _TF(
-                                            controller: _durCtrl,
-                                            hint: 'e.g. 4 weeks',
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: w,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const _FieldLabel('Required Skills'),
-                                          _TF(
-                                            controller: _skillsCtrl,
-                                            hint: 'e.g. Leadership, Python',
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ── VERIFICATION ────────────────────────────────────
-                      _SectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _sectionHeader(
-                              'Verification Settings',
-                              Icons.verified_rounded,
-                              _C.primary,
-                            ),
-                            const _FieldLabel('Verification Type'),
-                            const SizedBox(height: 0),
-                            _VerifyTypeSelector(
-                              selected: _verifyType,
-                              onChanged: (v) => setState(() => _verifyType = v),
-                            ),
-                            const SizedBox(height: 14),
-                            _Toggle(
-                              label: 'Blockchain Certificate',
-                              subtitle:
-                                  'Issue verifiable NFT credential on completion',
-                              icon: Icons.shield_rounded,
-                              iconColor: _C.neonCyan,
-                              value: _blockchainCert,
-                              onChanged: (v) =>
-                                  setState(() => _blockchainCert = v),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ── PUBLISH ─────────────────────────────────────────
-                      _PublishButton(
-                        label: 'Publish Volunteering Request',
-                        loading: _loading,
-                        onTap: _publish,
-                      ),
-                    ],
-                  ),
-                ),
+              _sectionHeader(
+                'Basic Information',
+                Icons.eco_rounded,
+                _C.neonGreen,
+              ),
+              const _FieldLabel('Title', required: true),
+              _TF(
+                controller: _titleCtrl,
+                hint: 'e.g. Campus Green Initiative Coordinator',
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Organization / Dept.'),
+              _TF(controller: _orgCtrl, hint: 'e.g. Eco Club'),
+              const SizedBox(height: 14),
+              const _FieldLabel('Category', required: true),
+              _Dropdown(
+                value: _category,
+                items: _categories,
+                onChanged: (v) => setState(() => _category = v!),
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Description', required: true),
+              _TF(
+                controller: _descCtrl,
+                hint: 'Describe the volunteering role and responsibilities...',
+                maxLines: 3,
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+
+        // ── Details & capacity ────────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sectionHeader(
+                'Details & Capacity',
+                Icons.tune_rounded,
+                _C.neonCyan,
+              ),
+              LayoutBuilder(
+                builder: (ctx, c) {
+                  const gap = 12.0;
+                  final w = (c.maxWidth - gap) / 2;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: w,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const _FieldLabel('Credit Points', required: true),
+                            _TF(
+                              controller: _creditCtrl,
+                              hint: 'e.g. 3',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: w,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const _FieldLabel(
+                              'Max Participants',
+                              required: true,
+                            ),
+                            _TF(
+                              controller: _maxCtrl,
+                              hint: 'e.g. 15',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: w,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const _FieldLabel('Duration'),
+                            _TF(controller: _durCtrl, hint: 'e.g. 4 weeks'),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: w,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const _FieldLabel('Required Skills'),
+                            _TF(
+                              controller: _skillsCtrl,
+                              hint: 'e.g. Leadership, Python',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+
+        // ── Verification settings ─────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sectionHeader(
+                'Verification Settings',
+                Icons.verified_rounded,
+                _C.primary,
+              ),
+              const _FieldLabel('Verification Type'),
+              const SizedBox(height: 6),
+              _VerifyTypeSelector(
+                selected: _verifyType,
+                onChanged: (v) => setState(() => _verifyType = v),
+              ),
+              const SizedBox(height: 14),
+              _Toggle(
+                label: 'Blockchain Certificate',
+                subtitle: 'Issue verifiable NFT credential on completion',
+                icon: Icons.shield_rounded,
+                iconColor: _C.neonCyan,
+                value: _blockchainCert,
+                onChanged: (v) => setState(() => _blockchainCert = v),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Publish ───────────────────────────────────────────────────────────
+        _PublishButton(
+          label: 'Publish Volunteering Request',
+          loading: _loading,
+          onTap: _publish,
+        ),
+        const SizedBox(height: 8),
+      ],
+    ),
+  );
 }
