@@ -1,11 +1,15 @@
-// faculty_manage_detail_screen.dart — Task 3 capacity guard added
-// See inline comments for every change vs previous version.
+// ═══════════════════════════════════════════════════════════════════════════════
+// faculty_manage_detail_screen.dart   Route: /faculty/manage/detail
+// ═══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'faculty_dashboard_layout.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DESIGN TOKENS
+// ─────────────────────────────────────────────────────────────────────────────
 class _C {
   static const card = Color(0xFF111827);
   static const primary = Color(0xFF8B5CF6);
@@ -20,10 +24,14 @@ class _C {
   static const secondary = Color(0xFF1A2235);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA MODELS
+// ─────────────────────────────────────────────────────────────────────────────
 class _ItemDetail {
   final String id, title, description, type, status, date, department;
   final int credits, participants, capacity;
   final bool blockchainVerified, isActivity;
+
   const _ItemDetail({
     required this.id,
     required this.title,
@@ -58,6 +66,9 @@ class _DetailData {
   const _DetailData({required this.item, required this.participants});
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FIRESTORE SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
 class _DetailService {
   static final _db = FirebaseFirestore.instance;
   static Map<String, dynamic> _safe(DocumentSnapshot doc) =>
@@ -67,6 +78,7 @@ class _DetailService {
     final col = isActivity ? 'activities' : 'volunteering';
     final itemDoc = await _db.collection(col).doc(id).get();
     final d = _safe(itemDoc);
+
     final item = isActivity
         ? _ItemDetail(
             id: id,
@@ -107,13 +119,16 @@ class _DetailService {
               .where('volunteeringId', isEqualTo: id)
               .get();
 
-    if (relSnap.docs.isEmpty) return _DetailData(item: item, participants: []);
+    if (relSnap.docs.isEmpty) {
+      return _DetailData(item: item, participants: []);
+    }
 
     final userIds = <String>{};
     for (final doc in relSnap.docs) {
       final uid = (_safe(doc)['userId'] as String?) ?? '';
       if (uid.isNotEmpty) userIds.add(uid);
     }
+
     final userMap = <String, Map<String, dynamic>>{};
     final uidList = userIds.toList();
     for (int i = 0; i < uidList.length; i += 30) {
@@ -122,7 +137,9 @@ class _DetailService {
           .collection('users')
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
-      for (final doc in snap.docs) userMap[doc.id] = _safe(doc);
+      for (final doc in snap.docs) {
+        userMap[doc.id] = _safe(doc);
+      }
     }
 
     final participants = relSnap.docs.map((doc) {
@@ -155,34 +172,10 @@ class _DetailService {
     return _DetailData(item: item, participants: participants);
   }
 
-  // ── TASK 3: capacity check before approve ─────────────────────────────────
-  static Future<void> approveEnrollment(
-    String docId,
-    bool isActivity,
-    String itemId,
-  ) async {
-    final itemCol = isActivity ? 'activities' : 'volunteering';
-    final itemDoc = await _db.collection(itemCol).doc(itemId).get();
-    final data = (itemDoc.data() as Map<String, dynamic>?) ?? {};
-
-    final enrolled = isActivity
-        ? (data['enrolled'] as int?) ?? 0
-        : (data['currentParticipants'] as int?) ?? 0;
-    final capacity = isActivity
-        ? (data['capacity'] as int?) ?? 0
-        : (data['maxParticipants'] as int?) ?? 0;
-    final status = (data['status'] as String?) ?? 'open';
-
-    // Task 5: 'full' is the item-level status, 'Approved' is enrollment status
-    if (status == 'full' || (capacity > 0 && enrolled >= capacity)) {
-      throw Exception('Activity is full — cannot approve more participants');
-    }
-
-    await _db
-        .collection(isActivity ? 'enrollments' : 'applications')
-        .doc(docId)
-        .update({'status': 'Approved'});
-  }
+  static Future<void> approveEnrollment(String docId, bool isActivity) => _db
+      .collection(isActivity ? 'enrollments' : 'applications')
+      .doc(docId)
+      .update({'status': 'Approved'});
 
   static Future<void> markCompleted(
     String docId,
@@ -216,15 +209,13 @@ class _DetailService {
     final relCol = isActivity ? 'enrollments' : 'applications';
     await _db.collection(relCol).doc(docId).update({'status': 'Verified'});
     final relDoc = await _db.collection(relCol).doc(docId).get();
-    final relData = (relDoc.data() as Map<String, dynamic>?) ?? {};
+    final relData = relDoc.data() ?? {};
     final itemId = isActivity
         ? (relData['activityId'] as String?) ?? ''
         : (relData['volunteeringId'] as String?) ?? '';
     if (itemId.isEmpty) return;
-    final itemDoc = await _db
-        .collection(isActivity ? 'activities' : 'volunteering')
-        .doc(itemId)
-        .get();
+    final itemCol = isActivity ? 'activities' : 'volunteering';
+    final itemDoc = await _db.collection(itemCol).doc(itemId).get();
     final credits = ((itemDoc.data() ?? {})['credits'] as int?) ?? 0;
     final existing = await _db
         .collection('certificates')
@@ -245,6 +236,9 @@ class _DetailService {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
 Color _statusColor(String s) {
   switch (s) {
     case 'Enrolled':
@@ -258,6 +252,7 @@ Color _statusColor(String s) {
       return _C.neonCyan;
     case 'Rejected':
       return _C.rose;
+    case 'active':
     case 'open':
       return _C.neonGreen;
     case 'full':
@@ -288,10 +283,14 @@ Widget _badge(String label) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GLASS CARD (unified style — Fix 4)
+// ─────────────────────────────────────────────────────────────────────────────
 class _GlassCard extends StatelessWidget {
   final Widget child;
   final Color? glowColor;
   const _GlassCard({required this.child, this.glowColor});
+
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
@@ -314,6 +313,9 @@ class _GlassCard extends StatelessWidget {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 class FacultyManageDetailScreen extends StatefulWidget {
   const FacultyManageDetailScreen({super.key});
   @override
@@ -354,6 +356,7 @@ class _FacultyManageDetailScreenState extends State<FacultyManageDetailScreen> {
         ),
       );
     }
+
     return FacultyDashboardLayout(
       currentRoute: '/faculty/manage',
       userName: '',
@@ -421,22 +424,20 @@ class _FacultyManageDetailScreenState extends State<FacultyManageDetailScreen> {
               ),
             );
           }
-          return _DetailBody(data: snap.data!, onReload: _reload, itemId: _id!);
+          return _DetailBody(data: snap.data!, onReload: _reload);
         },
       ),
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DETAIL BODY
+// ─────────────────────────────────────────────────────────────────────────────
 class _DetailBody extends StatelessWidget {
   final _DetailData data;
   final VoidCallback onReload;
-  final String itemId;
-  const _DetailBody({
-    required this.data,
-    required this.onReload,
-    required this.itemId,
-  });
+  const _DetailBody({required this.data, required this.onReload});
 
   @override
   Widget build(BuildContext context) {
@@ -450,6 +451,7 @@ class _DetailBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // ── Back button ────────────────────────────────────────────────────
         GestureDetector(
           onTap: () =>
               Navigator.pushReplacementNamed(context, '/faculty/manage'),
@@ -478,14 +480,18 @@ class _DetailBody extends StatelessWidget {
             ],
           ),
         ),
+
         const SizedBox(height: 16),
 
+        // ── Header card ────────────────────────────────────────────────────
         _GlassCard(
           glowColor: item.isActivity ? _C.primary : _C.neonGreen,
+
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Icon + title block
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -506,11 +512,13 @@ class _DetailBody extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
+                  // Fix 1 — title + badge in Wrap so badge never overflows
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Fix 1a — title + badge
                         Wrap(
                           spacing: 8,
                           runSpacing: 6,
@@ -535,6 +543,7 @@ class _DetailBody extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 6),
+                        // Fix meta chips — Wrap
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
@@ -549,6 +558,7 @@ class _DetailBody extends StatelessWidget {
                   ),
                 ],
               ),
+
               if (item.description.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -562,10 +572,14 @@ class _DetailBody extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+
               const SizedBox(height: 14),
               const Divider(color: _C.border, height: 1),
               const SizedBox(height: 14),
+
+              // Fix 2 — Stats: Wrap 2-per-row
               _StatsGrid(item: item, width: width),
+
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -608,6 +622,7 @@ class _DetailBody extends StatelessWidget {
           ),
         ),
 
+        // ── Participants heading ────────────────────────────────────────────
         Row(
           children: [
             Icon(Icons.people_rounded, size: 16, color: _C.primary),
@@ -642,6 +657,7 @@ class _DetailBody extends StatelessWidget {
             ),
           ],
         ),
+
         const SizedBox(height: 10),
 
         if (data.participants.isEmpty)
@@ -666,11 +682,11 @@ class _DetailBody extends StatelessWidget {
             (p) => _ParticipantCard(
               participant: p,
               isActivity: item.isActivity,
-              itemId: itemId,
               onAction: onReload,
             ),
           ),
 
+        // ── Smart Contract card ─────────────────────────────────────────────
         const SizedBox(height: 4),
         _GlassCard(
           glowColor: _C.neonCyan,
@@ -742,39 +758,46 @@ class _DetailBody extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Fix 2 — STATS GRID  (2-per-row via Wrap)
+// ─────────────────────────────────────────────────────────────────────────────
 class _StatsGrid extends StatelessWidget {
   final _ItemDetail item;
   final double width;
   const _StatsGrid({required this.item, required this.width});
+
   @override
   Widget build(BuildContext context) {
     final stats = [
-      (
+      _StatTuple(
         label: 'Credits',
         value: '${item.credits}',
         icon: Icons.star_rounded,
         color: _C.primary,
       ),
-      (
+      _StatTuple(
         label: 'Enrolled',
         value: '${item.participants}',
         icon: Icons.people_rounded,
         color: _C.neonBlue,
       ),
-      (
+      _StatTuple(
         label: 'Capacity',
         value: '${item.capacity}',
         icon: Icons.event_seat_rounded,
         color: _C.neonCyan,
       ),
-      (
+      _StatTuple(
         label: 'Date',
         value: item.date.isNotEmpty ? item.date : '—',
         icon: Icons.calendar_today_rounded,
         color: _C.amber,
       ),
     ];
+
+    // 2 cards per row, accounting for card padding (16*2) and gap (10)
     final cardW = (width - 32 - 10) / 2;
+
     return Wrap(
       spacing: 10,
       runSpacing: 10,
@@ -825,9 +848,25 @@ class _StatsGrid extends StatelessWidget {
   }
 }
 
+class _StatTuple {
+  final String label, value;
+  final IconData icon;
+  final Color color;
+  const _StatTuple({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// META CHIP & BLOCKCHAIN CHIP
+// ─────────────────────────────────────────────────────────────────────────────
 class _MetaChip extends StatelessWidget {
   final String label;
   const _MetaChip({required this.label});
+
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -870,15 +909,16 @@ class _BlockchainChip extends StatelessWidget {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PARTICIPANT CARD  — Fix 3 + Fix 5
+// ─────────────────────────────────────────────────────────────────────────────
 class _ParticipantCard extends StatefulWidget {
   final _Participant participant;
   final bool isActivity;
-  final String itemId;
   final VoidCallback onAction;
   const _ParticipantCard({
     required this.participant,
     required this.isActivity,
-    required this.itemId,
     required this.onAction,
   });
   @override
@@ -895,11 +935,7 @@ class _ParticipantCardState extends State<_ParticipantCard> {
       final p = widget.participant;
       switch (action) {
         case 'approve':
-          await _DetailService.approveEnrollment(
-            p.docId,
-            widget.isActivity,
-            widget.itemId,
-          );
+          await _DetailService.approveEnrollment(p.docId, widget.isActivity);
           break;
         case 'complete':
           await _DetailService.markCompleted(
@@ -922,14 +958,11 @@ class _ParticipantCardState extends State<_ParticipantCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              e.toString().replaceAll('Exception: ', ''),
+              'Error: $e',
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: _C.rose.withValues(alpha: 0.9),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
           ),
         );
       }
@@ -947,6 +980,7 @@ class _ParticipantCardState extends State<_ParticipantCard> {
                     .toUpperCase()
               : p.name[0].toUpperCase())
         : '?';
+
     final showApprove = p.status == 'Enrolled' || p.status == 'Applied';
     final showComplete = p.status == 'Approved';
     final showVerify = p.status == 'Completed';
@@ -960,9 +994,11 @@ class _ParticipantCardState extends State<_ParticipantCard> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _C.border),
       ),
+      // Fix 3 — outer layout: avatar + Expanded(info) + action column
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Avatar
           Container(
             width: 36,
             height: 36,
@@ -982,6 +1018,8 @@ class _ParticipantCardState extends State<_ParticipantCard> {
             ),
           ),
           const SizedBox(width: 10),
+
+          // Info — Expanded so it never pushes action column off-screen
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -998,6 +1036,7 @@ class _ParticipantCardState extends State<_ParticipantCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
+                // Fix 3 — email + date in Wrap (never overflows)
                 Wrap(
                   spacing: 8,
                   runSpacing: 3,
@@ -1049,7 +1088,10 @@ class _ParticipantCardState extends State<_ParticipantCard> {
               ],
             ),
           ),
+
           const SizedBox(width: 8),
+
+          // Action column — badge + button
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1100,6 +1142,9 @@ class _ParticipantCardState extends State<_ParticipantCard> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTION BUTTON
+// ─────────────────────────────────────────────────────────────────────────────
 class _ActionBtn extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -1111,6 +1156,7 @@ class _ActionBtn extends StatelessWidget {
     required this.colors,
     required this.onTap,
   });
+
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,

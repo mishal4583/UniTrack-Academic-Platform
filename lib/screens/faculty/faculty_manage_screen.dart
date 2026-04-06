@@ -160,9 +160,9 @@ Widget _statusBadge(String status) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withOpacity(0.4)),
+      border: Border.all(color: color.withValues(alpha: 0.4)),
     ),
     child: Text(
       status.toUpperCase(),
@@ -426,7 +426,7 @@ class _FacultyManageScreenState extends State<FacultyManageScreen> {
                         horizontal: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: _C.card.withOpacity(0.75),
+                        color: _C.card.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: _C.border),
                       ),
@@ -470,7 +470,7 @@ class _FacultyManageScreenState extends State<FacultyManageScreen> {
             Container(
               height: 44,
               decoration: BoxDecoration(
-                color: _C.card.withOpacity(0.7),
+                color: _C.card.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: _C.border),
               ),
@@ -534,12 +534,12 @@ class _FacultyManageScreenState extends State<FacultyManageScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: isActive
-                            ? _C.primary.withOpacity(0.15)
+                            ? _C.primary.withValues(alpha: 0.15)
                             : _C.secondary,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: isActive
-                              ? _C.primary.withOpacity(0.5)
+                              ? _C.primary.withValues(alpha: 0.5)
                               : _C.border,
                         ),
                       ),
@@ -604,10 +604,12 @@ class _TabButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: isActive ? _C.primary.withOpacity(0.15) : Colors.transparent,
+          color: isActive
+              ? _C.primary.withValues(alpha: 0.15)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
           border: isActive
-              ? Border.all(color: _C.primary.withOpacity(0.4))
+              ? Border.all(color: _C.primary.withValues(alpha: 0.4))
               : null,
         ),
         child: Row(
@@ -658,7 +660,7 @@ class _ItemCard extends StatelessWidget {
                 height: 38,
                 decoration: BoxDecoration(
                   color: (item.isActivity ? _C.primary : _C.neonGreen)
-                      .withOpacity(0.1),
+                      .withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -725,9 +727,11 @@ class _ItemCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: _C.neonCyan.withOpacity(0.1),
+                        color: _C.neonCyan.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _C.neonCyan.withOpacity(0.3)),
+                        border: Border.all(
+                          color: _C.neonCyan.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
@@ -831,7 +835,7 @@ class _ErrorBox extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: _C.border),
     ),
@@ -892,7 +896,7 @@ class _EmptyBox extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: _C.border),
     ),

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// student_certificates_screen.dart   Route: /student/certificates
+// student certificates_screen.dart   Route: /student/certificates
 //
 // DATA FLOW:
 //   1. Query certificates where userId == currentUser.uid
@@ -33,14 +33,14 @@ class _C {
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA MODEL
 // ─────────────────────────────────────────────────────────────────────────────
-class _Certificate {
+class Certificate {
   final String docId, userId, itemId, type, status;
   final int credits;
   final String title; // resolved from activities / volunteering
   final String? blockchainHash;
   final DateTime? createdAt;
 
-  const _Certificate({
+  const Certificate({
     required this.docId,
     required this.userId,
     required this.itemId,
@@ -83,7 +83,7 @@ class _CertService {
     return result;
   }
 
-  static Future<List<_Certificate>> loadForUser(String uid) async {
+  static Future<List<Certificate>> loadForUser(String uid) async {
     // ── Step 1: fetch all certificates for this user ──────────────────────────
     final certSnap = await _db
         .collection('certificates')
@@ -129,7 +129,7 @@ class _CertService {
           (type == 'activity' ? 'Activity' : 'Volunteering');
 
       final ts = d['createdAt'];
-      return _Certificate(
+      return Certificate(
         docId: doc.id,
         userId: uid,
         itemId: itemId,
@@ -161,7 +161,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()
-      ..color = const Color(0xFF1F2937).withOpacity(0.25)
+      ..color = const Color(0xFF1F2937).withValues(alpha: 0.25)
       ..strokeWidth = 0.8;
     for (double x = 0; x < size.width; x += 40) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
@@ -186,7 +186,7 @@ class StudentCertificatesScreen extends StatefulWidget {
 }
 
 class _StudentCertificatesScreenState extends State<StudentCertificatesScreen> {
-  Future<List<_Certificate>> _future = Future.value([]);
+  Future<List<Certificate>> _future = Future.value([]);
   String _filter = 'All'; // All / Activity / Volunteering
   String _status = 'All'; // All / issued / verified
 
@@ -204,7 +204,7 @@ class _StudentCertificatesScreenState extends State<StudentCertificatesScreen> {
     setState(() {});
   }
 
-  List<_Certificate> _applyFilters(List<_Certificate> all) => all.where((c) {
+  List<Certificate> _applyFilters(List<Certificate> all) => all.where((c) {
     final matchType = _filter == 'All' || c.type == _filter.toLowerCase();
     final matchStatus = _status == 'All' || c.status == _status;
     return matchType && matchStatus;
@@ -226,7 +226,7 @@ class _StudentCertificatesScreenState extends State<StudentCertificatesScreen> {
               Container(
                 padding: EdgeInsets.fromLTRB(16, topPad + 12, 16, 12),
                 decoration: BoxDecoration(
-                  color: _C.card.withOpacity(0.7),
+                  color: _C.card.withValues(alpha: 0.7),
                   border: const Border(bottom: BorderSide(color: _C.border)),
                 ),
                 child: Row(
@@ -296,7 +296,7 @@ class _StudentCertificatesScreenState extends State<StudentCertificatesScreen> {
 
               // ── Body ────────────────────────────────────────────────────────────
               Expanded(
-                child: FutureBuilder<List<_Certificate>>(
+                child: FutureBuilder<List<Certificate>>(
                   future: _future,
                   builder: (context, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
@@ -469,9 +469,9 @@ class _SummaryStrip extends StatelessWidget {
                 : EdgeInsets.zero,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              color: _C.card.withOpacity(0.75),
+              color: _C.card.withValues(alpha: 0.75),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: s.color.withOpacity(0.25)),
+              border: Border.all(color: s.color.withValues(alpha: 0.25)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -585,10 +585,10 @@ class _Chip extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isActive ? activeColor.withOpacity(0.15) : _C.secondary,
+        color: isActive ? activeColor.withValues(alpha: 0.15) : _C.secondary,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isActive ? activeColor.withOpacity(0.5) : _C.border,
+          color: isActive ? activeColor.withValues(alpha: 0.5) : _C.border,
         ),
       ),
       child: Text(
@@ -607,7 +607,7 @@ class _Chip extends StatelessWidget {
 // CERTIFICATE CARD
 // ─────────────────────────────────────────────────────────────────────────────
 class CertificateCard extends StatelessWidget {
-  final _Certificate cert;
+  final Certificate cert;
   const CertificateCard({super.key, required this.cert});
 
   static String _formatDate(DateTime? dt) {
@@ -625,7 +625,7 @@ class CertificateCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: _C.card.withOpacity(0.75),
+        color: _C.card.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _C.border),
       ),
@@ -659,7 +659,7 @@ class CertificateCard extends StatelessWidget {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.1),
+                        color: accentColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -698,10 +698,10 @@ class CertificateCard extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: accentColor.withOpacity(0.1),
+                                  color: accentColor.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: accentColor.withOpacity(0.3),
+                                    color: accentColor.withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Text(
@@ -720,10 +720,10 @@ class CertificateCard extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.1),
+                                  color: statusColor.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: statusColor.withOpacity(0.3),
+                                    color: statusColor.withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Row(
@@ -761,9 +761,11 @@ class CertificateCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: _C.amber.withOpacity(0.1),
+                        color: _C.amber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _C.amber.withOpacity(0.3)),
+                        border: Border.all(
+                          color: _C.amber.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -841,9 +843,11 @@ class CertificateCard extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: _C.neonCyan.withOpacity(0.06),
+                      color: _C.neonCyan.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _C.neonCyan.withOpacity(0.2)),
+                      border: Border.all(
+                        color: _C.neonCyan.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: const Row(
                       children: [
@@ -888,7 +892,7 @@ class _EmptyState extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 24),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
     ),
@@ -922,7 +926,7 @@ class _NoMatch extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
     ),

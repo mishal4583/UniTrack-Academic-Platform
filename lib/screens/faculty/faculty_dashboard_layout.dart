@@ -140,7 +140,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()
-      ..color = const Color(0xFF1F2937).withOpacity(0.3)
+      ..color = const Color(0xFF1F2937).withValues(alpha: 0.3)
       ..strokeWidth = 0.8;
     for (double x = 0; x < size.width; x += 40) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
@@ -179,8 +179,9 @@ class _SidebarContent extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
-    if (context.mounted)
+    if (context.mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+    }
   }
 
   @override
@@ -259,13 +260,13 @@ class _SidebarContent extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? _C.primary.withOpacity(0.12)
+                      ? _C.primary.withValues(alpha: 0.12)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: isActive
                       ? [
                           BoxShadow(
-                            color: _C.primary.withOpacity(0.15),
+                            color: _C.primary.withValues(alpha: 0.15),
                             blurRadius: 8,
                           ),
                         ]
@@ -418,7 +419,7 @@ class _Header extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(14, topPad + 8, 14, 10),
       decoration: BoxDecoration(
-        color: _C.card.withOpacity(0.7),
+        color: _C.card.withValues(alpha: 0.7),
         border: const Border(bottom: BorderSide(color: _C.border)),
       ),
       child: Row(
@@ -460,9 +461,9 @@ class _Header extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: _C.neonCyan.withOpacity(0.1),
+              color: _C.neonCyan.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _C.neonCyan.withOpacity(0.3)),
+              border: Border.all(color: _C.neonCyan.withValues(alpha: 0.3)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -573,7 +574,7 @@ class _FacultyDashboardLayoutState extends State<FacultyDashboardLayout> {
                   curve: Curves.easeInOut,
                   width: _sidebarExpanded ? 220 : 60,
                   decoration: BoxDecoration(
-                    color: _C.card.withOpacity(0.8),
+                    color: _C.card.withValues(alpha: 0.8),
                     border: const Border(right: BorderSide(color: _C.border)),
                   ),
                   child: _SidebarContent(
@@ -618,7 +619,7 @@ class _FacultyDashboardLayoutState extends State<FacultyDashboardLayout> {
             Positioned.fill(
               child: GestureDetector(
                 onTap: () => setState(() => _mobileDrawerOpen = false),
-                child: Container(color: Colors.black.withOpacity(0.5)),
+                child: Container(color: Colors.black.withValues(alpha: 0.5)),
               ),
             ),
 
@@ -630,7 +631,7 @@ class _FacultyDashboardLayoutState extends State<FacultyDashboardLayout> {
               width: 220,
               child: Container(
                 decoration: BoxDecoration(
-                  color: _C.card.withOpacity(0.97),
+                  color: _C.card.withValues(alpha: 0.97),
                   border: const Border(right: BorderSide(color: _C.border)),
                 ),
                 child: _SidebarContent(

@@ -99,7 +99,9 @@ class _ProfileService {
           .collection(col)
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
-      for (final doc in snap.docs) result[doc.id] = _safe(doc);
+      for (final doc in snap.docs) {
+        result[doc.id] = _safe(doc);
+      }
     }
     return result;
   }
@@ -264,14 +266,12 @@ class _ProfileService {
 class _GlassCard extends StatelessWidget {
   final Widget child;
   final Color? glowColor;
-  final EdgeInsets? padding;
-  const _GlassCard({required this.child, this.glowColor, this.padding});
-
+  const _GlassCard({required this.child, this.glowColor});
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
     margin: const EdgeInsets.only(bottom: 12),
-    padding: padding ?? const EdgeInsets.all(14),
+    padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),

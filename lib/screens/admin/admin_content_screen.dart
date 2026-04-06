@@ -324,11 +324,11 @@ class _ContentBodyState extends State<_ContentBody>
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: _primary.withOpacity(0.2),
+          color: _primary.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _primary.withOpacity(0.3)),
+          border: Border.all(color: _primary.withValues(alpha: 0.3)),
           boxShadow: [
-            BoxShadow(color: _primary.withOpacity(0.15), blurRadius: 8),
+            BoxShadow(color: _primary.withValues(alpha: 0.15), blurRadius: 8),
           ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
@@ -457,7 +457,7 @@ class _ContentBodyState extends State<_ContentBody>
                 Icon(
                   Icons.inbox_rounded,
                   size: 40,
-                  color: _mutedText.withOpacity(0.4),
+                  color: _mutedText.withValues(alpha: 0.4),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -482,7 +482,7 @@ class _ContentBodyState extends State<_ContentBody>
             headingRowColor: WidgetStateProperty.all(Colors.transparent),
             dataRowColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.hovered)) {
-                return _borderColor.withOpacity(0.5);
+                return _borderColor.withValues(alpha: 0.5);
               }
               return Colors.transparent;
             }),
@@ -703,7 +703,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -716,7 +716,7 @@ class _StatusBadge extends StatelessWidget {
               shape: BoxShape.circle,
               color: color,
               boxShadow: [
-                BoxShadow(color: color.withOpacity(0.7), blurRadius: 4),
+                BoxShadow(color: color.withValues(alpha: 0.7), blurRadius: 4),
               ],
             ),
           ),
@@ -808,7 +808,7 @@ class _IconActionState extends State<_IconAction> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             color: _hovered
-                ? widget.color.withOpacity(0.12)
+                ? widget.color.withValues(alpha: 0.12)
                 : Colors.transparent,
           ),
           child: Icon(widget.icon, size: 15, color: widget.color),
@@ -845,7 +845,7 @@ class _DeleteDialog extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: _destructive.withOpacity(0.1),
+                    color: _destructive.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
@@ -944,12 +944,14 @@ class _StatMiniCardState extends State<_StatMiniCard> {
         color: _cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: _hovered ? widget.data.color.withOpacity(0.4) : _borderColor,
+          color: _hovered
+              ? widget.data.color.withValues(alpha: 0.4)
+              : _borderColor,
         ),
         boxShadow: _hovered
             ? [
                 BoxShadow(
-                  color: widget.data.color.withOpacity(0.12),
+                  color: widget.data.color.withValues(alpha: 0.12),
                   blurRadius: 16,
                   spreadRadius: 1,
                 ),
@@ -1068,18 +1070,23 @@ class _FilterChipState extends State<_FilterChip> {
           color: widget.selected
               ? _primary
               : _hovered
-              ? _primary.withOpacity(0.1)
+              ? _primary.withValues(alpha: 0.1)
               : _cardColor,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: widget.selected
                 ? _primary
                 : _hovered
-                ? _primary.withOpacity(0.4)
+                ? _primary.withValues(alpha: 0.4)
                 : _borderColor,
           ),
           boxShadow: widget.selected
-              ? [BoxShadow(color: _primary.withOpacity(0.35), blurRadius: 10)]
+              ? [
+                  BoxShadow(
+                    color: _primary.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                  ),
+                ]
               : [],
         ),
         child: Text(
@@ -1122,10 +1129,15 @@ class _NeonButtonState extends State<_NeonButton> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: _hovered ? _primary : _primary.withOpacity(0.88),
+          color: _hovered ? _primary : _primary.withValues(alpha: 0.88),
           borderRadius: BorderRadius.circular(8),
           boxShadow: _hovered
-              ? [BoxShadow(color: _primary.withOpacity(0.45), blurRadius: 14)]
+              ? [
+                  BoxShadow(
+                    color: _primary.withValues(alpha: 0.45),
+                    blurRadius: 14,
+                  ),
+                ]
               : [],
         ),
         child: Row(
@@ -1213,12 +1225,12 @@ class _DangerButtonState extends State<_DangerButton> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: _hovered ? _destructive : _destructive.withOpacity(0.85),
+          color: _hovered ? _destructive : _destructive.withValues(alpha: .85),
           borderRadius: BorderRadius.circular(8),
           boxShadow: _hovered
               ? [
                   BoxShadow(
-                    color: _destructive.withOpacity(0.4),
+                    color: _destructive.withValues(alpha: 0.4),
                     blurRadius: 12,
                   ),
                 ]
@@ -1253,7 +1265,7 @@ class _GlassContainer extends StatelessWidget {
       child: Container(
         padding: padding,
         decoration: BoxDecoration(
-          color: _cardColor.withOpacity(0.85),
+          color: _cardColor.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _borderColor),
         ),
@@ -1304,9 +1316,9 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: _destructive.withOpacity(0.08),
+      color: _destructive.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: _destructive.withOpacity(0.3)),
+      border: Border.all(color: _destructive.withValues(alpha: 0.3)),
     ),
     child: Row(
       children: [

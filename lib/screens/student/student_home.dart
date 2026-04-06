@@ -272,7 +272,12 @@ class _GlassCard extends StatelessWidget {
   final Widget child;
   final Color? glowColor;
   final VoidCallback? onTap;
-  const _GlassCard({required this.child, this.glowColor, this.onTap});
+
+  const _GlassCard({
+    required this.child,
+    this.glowColor,
+    this.onTap, // ✅ FIXED
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +300,7 @@ class _GlassCard extends StatelessWidget {
       ),
       child: child,
     );
+
     return onTap == null ? box : GestureDetector(onTap: onTap, child: box);
   }
 }

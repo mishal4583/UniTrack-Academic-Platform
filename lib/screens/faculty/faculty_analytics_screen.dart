@@ -1,23 +1,17 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // faculty_analytics_screen.dart   Route: /faculty/analytics
 //
-// KEY FIX vs previous version:
-//   _TopBar back button — changed from Navigator.pop(context) to:
+// FIX 1 — White screen when pressing back from Analytics:
+//   _TopBar previously called Navigator.pop(context) unconditionally.
+//   Analytics is a PEER route reached via pushReplacementNamed, so there is
+//   nothing below it to pop → navigator stack empties → blank screen.
+//   SOLUTION: Check Navigator.canPop() first; fall back to pushReplacementNamed.
 //
-//     if (Navigator.canPop(context)) {
-//       Navigator.pop(context);
-//     } else {
-//       Navigator.pushReplacementNamed(context, '/faculty');
-//     }
-//
-//   WHY: Analytics is reached via pushReplacementNamed from the bottom nav.
-//   That means there is no previous route on the stack to pop back to.
-//   Calling Navigator.pop() on an empty stack produces a blank white screen
-//   on Flutter Web. The canPop() guard means:
-//     • If user somehow reached Analytics via pushNamed (e.g. deep-link) → pop works.
-//     • If user reached it via pushReplacementNamed → fall back to /faculty safely.
-//
-// Everything else is identical to the last working version.
+// FIX 2 — "setState() callback returned a Future":
+//   _load() was called directly from initState() as an async void, which made
+//   initState() implicitly return a Future — Flutter detects this and throws.
+//   SOLUTION: Assign _future synchronously in initState; use Future.microtask
+//   for anything that needs setState after an await.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:math' as math;
@@ -25,13 +19,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:collection/collection.dart';
+import 'package:unitrack_flutter/screens/faculty/faculty_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
 class _C {
-  static const bg = Color(0xFF080D19);
+  static const bg = Color(0xFF080D19); // used for chart dot stroke colour
   static const card = Color(0xFF111827);
   static const primary = Color(0xFF8B5CF6);
   static const neonBlue = Color(0xFF3B82F6);
@@ -46,17 +40,12 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATA MODELS
+// MODELS
 // ─────────────────────────────────────────────────────────────────────────────
 class _AnalyticsData {
-  final int totalActivities;
-  final int totalVolunteering;
-  final int totalParticipants;
-  final int totalCreditsIssued;
-  final int verifiedCount;
-  final int pendingCount;
-  final List<_MonthPoint> monthlyActivity;
-  final List<_MonthPoint> creditTrend;
+  final int totalActivities, totalVolunteering, totalParticipants;
+  final int totalCreditsIssued, verifiedCount, pendingCount;
+  final List<_MonthPoint> monthlyActivity, creditTrend;
   final Map<String, int> typeDistribution;
   final List<_StudentStat> topStudents;
 
@@ -76,9 +65,7 @@ class _AnalyticsData {
 
 class _MonthPoint {
   final String label;
-  final double activities;
-  final double participants;
-  final double credits;
+  final double activities, participants, credits;
   const _MonthPoint({
     required this.label,
     this.activities = 0,
@@ -88,10 +75,8 @@ class _MonthPoint {
 }
 
 class _StudentStat {
-  final String userId;
-  final String name;
-  final int credits;
-  final int activities;
+  final String userId, name;
+  final int credits, activities;
   const _StudentStat({
     required this.userId,
     required this.name,
@@ -105,9 +90,8 @@ class _StudentStat {
 // ─────────────────────────────────────────────────────────────────────────────
 class _AnalyticsService {
   static final _db = FirebaseFirestore.instance;
-
   static Map<String, dynamic> _safe(DocumentSnapshot doc) =>
-      (doc.data() as Map<String, dynamic>?) ?? {};
+      (doc.data() ?? {}) as Map<String, dynamic>;
 
   static Future<_AnalyticsData> load(String uid) async {
     final results = await Future.wait([
@@ -128,20 +112,17 @@ class _AnalyticsService {
     final volIds = volSnap.docs.map((d) => d.id).toSet();
 
     final studentSet = <String>{};
-    int verified = 0;
-    int pending = 0;
-
+    int verified = 0, pending = 0;
     for (final doc in enrSnap.docs) {
       final d = _safe(doc);
       if (!actIds.contains((d['activityId'] as String?) ?? '')) continue;
       final u = (d['userId'] as String?) ?? '';
       if (u.isNotEmpty) studentSet.add(u);
       final s = (d['status'] as String?) ?? '';
-      if (s == 'Verified' || s == 'Completed') {
+      if (s == 'Verified' || s == 'Completed')
         verified++;
-      } else if (s == 'Enrolled') {
+      else if (s == 'Enrolled')
         pending++;
-      }
     }
     for (final doc in appSnap.docs) {
       final d = _safe(doc);
@@ -149,11 +130,10 @@ class _AnalyticsService {
       final u = (d['userId'] as String?) ?? '';
       if (u.isNotEmpty) studentSet.add(u);
       final s = (d['status'] as String?) ?? '';
-      if (s == 'Verified' || s == 'Completed') {
+      if (s == 'Verified' || s == 'Completed')
         verified++;
-      } else if (s == 'Applied') {
+      else if (s == 'Applied')
         pending++;
-      }
     }
 
     int totalCredits = 0;
@@ -189,34 +169,39 @@ class _AnalyticsService {
       'Dec',
     ];
 
-    final actPerMonth = <String, double>{};
-    final partPerMonth = <String, double>{};
-    final credPerMonth = <String, double>{};
+    final actPM = <String, double>{};
+    final partPM = <String, double>{};
+    final credPM = <String, double>{};
     for (final m in months) {
-      final k = '${m.year}-${m.month}';
-      actPerMonth[k] = partPerMonth[k] = credPerMonth[k] = 0;
+      final key = '${m.year}-${m.month}';
+      actPM[key] = 0;
+      partPM[key] = 0;
+      credPM[key] = 0;
     }
     for (final doc in actSnap.docs) {
       final d = _safe(doc);
       final ts = d['createdAt'];
       if (ts is! Timestamp) continue;
-      final k = '${ts.toDate().year}-${ts.toDate().month}';
-      if (!actPerMonth.containsKey(k)) continue;
-      actPerMonth[k] = (actPerMonth[k] ?? 0) + 1;
-      partPerMonth[k] = (partPerMonth[k] ?? 0) + ((d['enrolled'] as int?) ?? 0);
-      credPerMonth[k] =
-          (credPerMonth[k] ?? 0) +
+      final dt = ts.toDate();
+      final key = '${dt.year}-${dt.month}';
+      if (!actPM.containsKey(key)) continue;
+      actPM[key] = (actPM[key] ?? 0) + 1;
+      partPM[key] = (partPM[key] ?? 0) + ((d['enrolled'] as int?) ?? 0);
+      credPM[key] =
+          (credPM[key] ?? 0) +
           ((d['credits'] as int?) ?? 0) * ((d['enrolled'] as int?) ?? 0);
     }
+
     final monthlyActivity = months.map((m) {
-      final k = '${m.year}-${m.month}';
+      final key = '${m.year}-${m.month}';
       return _MonthPoint(
         label: monthLabels[m.month - 1],
-        activities: actPerMonth[k] ?? 0,
-        participants: partPerMonth[k] ?? 0,
-        credits: credPerMonth[k] ?? 0,
+        activities: actPM[key] ?? 0,
+        participants: partPM[key] ?? 0,
+        credits: credPM[key] ?? 0,
       );
     }).toList();
+
     final creditTrend = monthlyActivity
         .map((p) => _MonthPoint(label: p.label, credits: p.credits))
         .toList();
@@ -234,20 +219,22 @@ class _AnalyticsService {
       if (!actIds.contains((d['activityId'] as String?) ?? '')) continue;
       final s = (d['status'] as String?) ?? '';
       if (s != 'Completed' && s != 'Verified') continue;
-      final u = (d['userId'] as String?) ?? '';
-      if (u.isEmpty) continue;
-      final activityId = (d['activityId'] as String?) ?? '';
-      final actDoc = actSnap.docs.firstWhereOrNull((a) => a.id == activityId);
-      final c = actDoc != null ? ((_safe(actDoc)['credits'] as int?) ?? 0) : 0;
-      creditMap[u] = (creditMap[u] ?? 0) + c;
-      actCountMap[u] = (actCountMap[u] ?? 0) + 1;
+      final u2 = (d['userId'] as String?) ?? '';
+      if (u2.isEmpty) continue;
+      final aid = (d['activityId'] as String?) ?? '';
+      final aDoc = actSnap.docs.where((a) => a.id == aid).firstOrNull;
+      final c = aDoc != null ? ((_safe(aDoc)['credits'] as int?) ?? 0) : 0;
+      creditMap[u2] = (creditMap[u2] ?? 0) + c;
+      actCountMap[u2] = (actCountMap[u2] ?? 0) + 1;
     }
+
     final userNameMap = <String, String>{};
     for (final doc in usersSnap.docs) {
       final d = _safe(doc);
       userNameMap[doc.id] =
           (d['name'] as String?) ?? (d['email'] as String?) ?? doc.id;
     }
+
     final sorted = creditMap.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final topStudents = sorted
@@ -282,187 +269,8 @@ class _AnalyticsService {
 // ─────────────────────────────────────────────────────────────────────────────
 // GRID PAINTER
 // ─────────────────────────────────────────────────────────────────────────────
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF1F2937).withValues(alpha: 0.3)
-      ..strokeWidth = 0.8;
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    }
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter _) => false;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// PULSING DOT
-// ─────────────────────────────────────────────────────────────────────────────
-class _PulsingDot extends StatefulWidget {
-  const _PulsingDot();
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat(reverse: true);
-    _anim = Tween(begin: 0.3, end: 1.0).animate(_ctrl);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-    opacity: _anim,
-    child: Container(
-      width: 7,
-      height: 7,
-      decoration: const BoxDecoration(
-        color: _C.neonCyan,
-        shape: BoxShape.circle,
-      ),
-    ),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TOP BAR — FIXED back-navigation
-// ─────────────────────────────────────────────────────────────────────────────
-class _TopBar extends StatelessWidget {
-  const _TopBar();
-
-  // ── THE KEY FIX ─────────────────────────────────────────────────────────────
-  // BEFORE: onTap: () => Navigator.pop(context)
-  //   → crashes with blank white screen when Analytics was reached via
-  //     pushReplacementNamed (nothing to pop to on Flutter Web).
-  //
-  // AFTER: canPop() guard → pop if possible, otherwise pushReplacementNamed.
-  //   → always lands on a valid route no matter how the page was opened.
-  // ────────────────────────────────────────────────────────────────────────────
-  void _goBack(BuildContext context) {
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    } else {
-      Navigator.pushReplacementNamed(context, '/faculty');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, topPad + 10, 16, 12),
-      decoration: BoxDecoration(
-        color: _C.card.withValues(alpha: 0.7),
-        border: const Border(bottom: BorderSide(color: _C.border)),
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => _goBack(context),
-            child: Container(
-              width: 34,
-              height: 34,
-              margin: const EdgeInsets.only(right: 10),
-              decoration: BoxDecoration(
-                color: _C.secondary,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _C.border),
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: _C.muted,
-                size: 15,
-              ),
-            ),
-          ),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: _C.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.bar_chart_rounded,
-              color: _C.primary,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Analytics & Reports',
-                  style: TextStyle(
-                    color: _C.text,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  'Track performance, participation & credit distribution',
-                  style: TextStyle(color: _C.muted, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _C.neonCyan.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _C.neonCyan.withValues(alpha: 0.3)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _PulsingDot(),
-                SizedBox(width: 5),
-                Text(
-                  'Live',
-                  style: TextStyle(
-                    color: _C.neonCyan,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GLASS CARD
+// SHARED WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 class _Card extends StatelessWidget {
   final Widget child;
@@ -492,16 +300,73 @@ class _Card extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STAT CARD
-// ─────────────────────────────────────────────────────────────────────────────
+class _CardHeader extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  const _CardHeader({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: iconColor, size: 15),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          title,
+          style: const TextStyle(
+            color: _C.text,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ],
+  );
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(color: _C.muted, fontSize: 10)),
+    ],
+  );
+}
+
 class _StatCard extends StatelessWidget {
   final String label, value;
   final IconData icon;
   final Color iconColor;
   final String? trend;
   final bool trendUp;
-
   const _StatCard({
     required this.label,
     required this.value,
@@ -583,7 +448,7 @@ class _StatCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BAR CHART
+// CHARTS
 // ─────────────────────────────────────────────────────────────────────────────
 class _MonthlyBarChart extends StatelessWidget {
   final List<_MonthPoint> data;
@@ -728,9 +593,6 @@ class _MonthlyBarChart extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LINE CHART
-// ─────────────────────────────────────────────────────────────────────────────
 class _CreditTrendChart extends StatelessWidget {
   final List<_MonthPoint> data;
   const _CreditTrendChart({required this.data});
@@ -739,7 +601,6 @@ class _CreditTrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (data.isEmpty) return const SizedBox();
     final maxY = data.map((e) => e.credits).fold(0.0, math.max);
-
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,7 +677,7 @@ class _CreditTrendChart extends StatelessWidget {
                     barWidth: 2.5,
                     dotData: FlDotData(
                       show: true,
-                      getDotPainter: (_, _, _, _) => FlDotCirclePainter(
+                      getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
                         radius: 4,
                         color: _C.neonGreen,
                         strokeColor: _C.bg,
@@ -856,9 +717,6 @@ class _CreditTrendChart extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DONUT CHART
-// ─────────────────────────────────────────────────────────────────────────────
 class _TypeDistributionChart extends StatefulWidget {
   final Map<String, int> data;
   const _TypeDistributionChart({required this.data});
@@ -867,7 +725,7 @@ class _TypeDistributionChart extends StatefulWidget {
 }
 
 class _TypeDistributionChartState extends State<_TypeDistributionChart> {
-  int _touched = -1;
+  int _touchedIndex = -1;
   static const _colors = [
     _C.primary,
     _C.neonBlue,
@@ -917,20 +775,19 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                     PieChartData(
                       pieTouchData: PieTouchData(
                         touchCallback: (_, res) => setState(
-                          () => _touched =
+                          () => _touchedIndex =
                               res?.touchedSection?.touchedSectionIndex ?? -1,
                         ),
                       ),
                       sectionsSpace: 3,
                       centerSpaceRadius: 46,
                       sections: List.generate(entries.length, (i) {
+                        final e = entries[i];
                         final color = _colors[i % _colors.length];
-                        final pct = total > 0
-                            ? (entries[i].value / total * 100)
-                            : 0.0;
-                        final touched = i == _touched;
+                        final pct = total > 0 ? (e.value / total * 100) : 0.0;
+                        final touched = i == _touchedIndex;
                         return PieChartSectionData(
-                          value: entries[i].value.toDouble(),
+                          value: e.value.toDouble(),
                           color: color,
                           radius: touched ? 54 : 46,
                           title: '${pct.round()}%',
@@ -953,6 +810,7 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: List.generate(entries.length, (i) {
+                    final e = entries[i];
                     final color = _colors[i % _colors.length];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -969,7 +827,7 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              entries[i].key,
+                              e.key,
                               style: const TextStyle(
                                 color: _C.muted,
                                 fontSize: 11,
@@ -980,7 +838,7 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${entries[i].value}',
+                            '${e.value}',
                             style: const TextStyle(
                               color: _C.text,
                               fontSize: 11,
@@ -1001,9 +859,6 @@ class _TypeDistributionChartState extends State<_TypeDistributionChart> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TOP STUDENTS
-// ─────────────────────────────────────────────────────────────────────────────
 class _TopStudentsCard extends StatelessWidget {
   final List<_StudentStat> students;
   const _TopStudentsCard({required this.students});
@@ -1121,9 +976,6 @@ class _TopStudentsCard extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// VERIFICATION STATUS
-// ─────────────────────────────────────────────────────────────────────────────
 class _VerificationStatusCard extends StatelessWidget {
   final int verified, pending;
   const _VerificationStatusCard({
@@ -1136,7 +988,6 @@ class _VerificationStatusCard extends StatelessWidget {
     final total = verified + pending;
     final rate = total > 0 ? (verified / total * 100).round() : 0;
     final filPct = total > 0 ? (verified / total).clamp(0.0, 1.0) : 0.0;
-
     return _Card(
       glowColor: _C.neonCyan.withValues(alpha: 0.3),
       child: Column(
@@ -1260,71 +1111,6 @@ class _VerifyStat extends StatelessWidget {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SHARED HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-class _CardHeader extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color iconColor;
-  const _CardHeader({
-    required this.title,
-    required this.icon,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: iconColor, size: 15),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          title,
-          style: const TextStyle(
-            color: _C.text,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    ],
-  );
-}
-
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _LegendDot({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(3),
-        ),
-      ),
-      const SizedBox(width: 5),
-      Text(label, style: const TextStyle(color: _C.muted, fontSize: 10)),
-    ],
-  );
-}
-
 class _SummaryRow extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -1373,42 +1159,41 @@ class FacultyAnalyticsScreen extends StatefulWidget {
 class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
   late Future<_AnalyticsData> _future;
   String _displayName = '';
+  String _uid = '';
 
   @override
   void initState() {
     super.initState();
-    _loadAll();
-  }
-
-  // Uses the same mounted-safe pattern as faculty_home.dart:
-  // 1. Kick off the data fetch synchronously (no async setState).
-  // 2. Fetch display name separately; check mounted before setState.
-  void _loadAll() {
+    // ── Assign _future synchronously — required by `late`, no setState needed.
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _future = Future.value(_empty());
-      return;
+    if (user != null) {
+      _uid = user.uid;
+      _future = _AnalyticsService.load(_uid);
+    } else {
+      _future = Future.error('Not signed in');
     }
-
-    // Store future synchronously — no setState needed here because
-    // this is called from initState (before first build) or from
-    // a plain setState wrapper below.
-    _future = _AnalyticsService.load(user.uid);
-
-    // Fetch display name in background — mounted check before setState
-    FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((
-      doc,
-    ) {
-      if (!mounted) return;
-      final data = doc.data();
-      final name = (data?['name'] as String?) ?? '';
-      if (name.isNotEmpty) setState(() => _displayName = name);
-    });
+    // Fetch display name after mount — deferred safely.
+    Future.microtask(_fetchDisplayName);
   }
 
+  Future<void> _fetchDisplayName() async {
+    if (_uid.isEmpty || !mounted) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .get();
+      if (!mounted) return;
+      final name = ((doc.data()?['name']) as String?) ?? '';
+      if (name.isNotEmpty) setState(() => _displayName = name);
+    } catch (_) {}
+  }
+
+  // Refresh: create Future synchronously, assign in sync setState — no Future returned.
   void _refresh() {
-    if (!mounted) return;
-    setState(_loadAll);
+    if (!mounted || _uid.isEmpty) return;
+    final f = _AnalyticsService.load(_uid);
+    setState(() => _future = f);
   }
 
   _AnalyticsData _empty() => const _AnalyticsData(
@@ -1425,251 +1210,241 @@ class _FacultyAnalyticsScreenState extends State<FacultyAnalyticsScreen> {
   );
 
   @override
-  Widget build(BuildContext context) {
-    final botPad = MediaQuery.of(context).padding.bottom;
+  Widget build(BuildContext context) => FacultyDashboardLayout(
+    currentRoute: '/faculty/analytics',
+    userName: _displayName,
+    child: FutureBuilder<_AnalyticsData>(
+      future: _future,
+      builder: (context, snap) {
+        // ── Loading ──────────────────────────────────────────────────────────
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 80),
+            child: Center(child: CircularProgressIndicator(color: _C.primary)),
+          );
+        }
 
-    return Scaffold(
-      backgroundColor: _C.bg,
-      body: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-          Column(
-            children: [
-              const _TopBar(),
-              Expanded(
-                child: FutureBuilder<_AnalyticsData>(
-                  future: _future,
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: _C.primary),
-                      );
-                    }
-                    if (snap.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.error_outline_rounded,
-                                color: Colors.redAccent,
-                                size: 40,
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Failed to load analytics',
-                                style: TextStyle(
-                                  color: _C.text,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                snap.error.toString(),
-                                style: const TextStyle(
-                                  color: _C.muted,
-                                  fontSize: 12,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 20),
-                              GestureDetector(
-                                onTap: _refresh,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [_C.primary, _C.neonBlue],
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.refresh_rounded,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Retry',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+        // ── Error ─────────────────────────────────────────────────────────────
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Failed to load analytics',
+                    style: TextStyle(
+                      color: _C.text,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    snap.error.toString(),
+                    style: const TextStyle(color: _C.muted, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: _refresh,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_C.primary, _C.neonBlue],
                         ),
-                      );
-                    }
-
-                    final data = snap.data ?? _empty();
-                    final verRate = (data.verifiedCount + data.pendingCount) > 0
-                        ? '${(data.verifiedCount / (data.verifiedCount + data.pendingCount) * 100).round()}%'
-                        : '—';
-
-                    return SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(16, 16, 16, botPad + 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
                           Text(
-                            _displayName.isNotEmpty
-                                ? 'Dr. $_displayName\'s Analytics'
-                                : 'Analytics & Reports',
-                            style: const TextStyle(
-                              color: _C.text,
-                              fontSize: 20,
+                            'Retry',
+                            style: TextStyle(
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Track performance, participation & credit distribution',
-                            style: TextStyle(color: _C.muted, fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Stat grid
-                          LayoutBuilder(
-                            builder: (ctx, c) {
-                              const gap = 10.0;
-                              final w = (c.maxWidth - gap) / 2;
-                              final stats = [
-                                (
-                                  label: 'Total Activities',
-                                  value: '${data.totalActivities}',
-                                  icon: Icons.menu_book_rounded,
-                                  color: _C.primary,
-                                  trend: 'created by you',
-                                  up: true,
-                                ),
-                                (
-                                  label: 'Total Participants',
-                                  value: '${data.totalParticipants}',
-                                  icon: Icons.people_rounded,
-                                  color: _C.neonBlue,
-                                  trend: 'unique students',
-                                  up: true,
-                                ),
-                                (
-                                  label: 'Credits Issued',
-                                  value: '${data.totalCreditsIssued}',
-                                  icon: Icons.star_rounded,
-                                  color: _C.neonCyan,
-                                  trend: 'total distributed',
-                                  up: true,
-                                ),
-                                (
-                                  label: 'Verification Rate',
-                                  value: verRate,
-                                  icon: Icons.verified_rounded,
-                                  color: _C.neonGreen,
-                                  trend: 'approvals',
-                                  up: true,
-                                ),
-                              ];
-                              return Wrap(
-                                spacing: gap,
-                                runSpacing: gap,
-                                children: stats
-                                    .map(
-                                      (s) => SizedBox(
-                                        width: w,
-                                        child: _StatCard(
-                                          label: s.label,
-                                          value: s.value,
-                                          icon: s.icon,
-                                          iconColor: s.color,
-                                          trend: s.trend,
-                                          trendUp: s.up,
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 6),
-
-                          _VerificationStatusCard(
-                            verified: data.verifiedCount,
-                            pending: data.pendingCount,
-                          ),
-                          _MonthlyBarChart(data: data.monthlyActivity),
-                          _TypeDistributionChart(data: data.typeDistribution),
-                          _TopStudentsCard(students: data.topStudents),
-                          _CreditTrendChart(data: data.creditTrend),
-
-                          // Summary
-                          _Card(
-                            glowColor: _C.primary.withValues(alpha: 0.2),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const _CardHeader(
-                                  title: 'Summary',
-                                  icon: Icons.summarize_rounded,
-                                  iconColor: _C.amber,
-                                ),
-                                const SizedBox(height: 12),
-                                _SummaryRow(
-                                  icon: Icons.menu_book_rounded,
-                                  color: _C.primary,
-                                  text:
-                                      '${data.totalActivities} activities and ${data.totalVolunteering} volunteering opportunities created',
-                                ),
-                                const SizedBox(height: 8),
-                                _SummaryRow(
-                                  icon: Icons.people_rounded,
-                                  color: _C.neonBlue,
-                                  text:
-                                      '${data.totalParticipants} unique students have participated across all your programmes',
-                                ),
-                                const SizedBox(height: 8),
-                                _SummaryRow(
-                                  icon: Icons.star_rounded,
-                                  color: _C.neonCyan,
-                                  text:
-                                      '${data.totalCreditsIssued} total credits distributed to participating students',
-                                ),
-                                const SizedBox(height: 8),
-                                _SummaryRow(
-                                  icon: Icons.pending_actions_rounded,
-                                  color: _C.amber,
-                                  text:
-                                      '${data.pendingCount} verifications pending — visit Verify panel to take action',
-                                ),
-                              ],
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          );
+        }
+
+        // ── Data ──────────────────────────────────────────────────────────────
+        final data = snap.data ?? _empty();
+        final total = data.verifiedCount + data.pendingCount;
+        final verRate = total > 0
+            ? '${(data.verifiedCount / total * 100).round()}%'
+            : '—';
+
+        // FacultyDashboardLayout owns Scaffold + SingleChildScrollView.
+        // child must be Column(mainAxisSize: MainAxisSize.min) — NO Expanded,
+        // NO Scaffold, NO Stack with Positioned.fill here.
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Heading
+            Text(
+              _displayName.isNotEmpty
+                  ? 'Dr. $_displayName\'s Analytics'
+                  : 'Analytics & Reports',
+              style: const TextStyle(
+                color: _C.text,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Track performance, participation & credit distribution',
+              style: TextStyle(color: _C.muted, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 20),
+
+            // Stat grid
+            LayoutBuilder(
+              builder: (ctx, c) {
+                const gap = 10.0;
+                final w = (c.maxWidth - gap) / 2;
+                final stats = [
+                  (
+                    label: 'Total Activities',
+                    value: '${data.totalActivities}',
+                    icon: Icons.menu_book_rounded,
+                    color: _C.primary,
+                    trend: 'created by you',
+                    up: true,
+                  ),
+                  (
+                    label: 'Total Participants',
+                    value: '${data.totalParticipants}',
+                    icon: Icons.people_rounded,
+                    color: _C.neonBlue,
+                    trend: 'unique students',
+                    up: true,
+                  ),
+                  (
+                    label: 'Credits Issued',
+                    value: '${data.totalCreditsIssued}',
+                    icon: Icons.star_rounded,
+                    color: _C.neonCyan,
+                    trend: 'total distributed',
+                    up: true,
+                  ),
+                  (
+                    label: 'Verification Rate',
+                    value: verRate,
+                    icon: Icons.verified_rounded,
+                    color: _C.neonGreen,
+                    trend: 'approvals',
+                    up: true,
+                  ),
+                ];
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: stats
+                      .map(
+                        (s) => SizedBox(
+                          width: w,
+                          child: _StatCard(
+                            label: s.label,
+                            value: s.value,
+                            icon: s.icon,
+                            iconColor: s.color,
+                            trend: s.trend,
+                            trendUp: s.up,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 6),
+
+            _VerificationStatusCard(
+              verified: data.verifiedCount,
+              pending: data.pendingCount,
+            ),
+            _MonthlyBarChart(data: data.monthlyActivity),
+            _TypeDistributionChart(data: data.typeDistribution),
+            _TopStudentsCard(students: data.topStudents),
+            _CreditTrendChart(data: data.creditTrend),
+
+            // Summary
+            _Card(
+              glowColor: _C.primary.withValues(alpha: 0.2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _CardHeader(
+                    title: 'Summary',
+                    icon: Icons.summarize_rounded,
+                    iconColor: _C.amber,
+                  ),
+                  const SizedBox(height: 12),
+                  _SummaryRow(
+                    icon: Icons.menu_book_rounded,
+                    color: _C.primary,
+                    text:
+                        '${data.totalActivities} activities and ${data.totalVolunteering} volunteering opportunities created',
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    icon: Icons.people_rounded,
+                    color: _C.neonBlue,
+                    text:
+                        '${data.totalParticipants} unique students have participated across all your programmes',
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    icon: Icons.star_rounded,
+                    color: _C.neonCyan,
+                    text:
+                        '${data.totalCreditsIssued} total credits distributed to participating students',
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    icon: Icons.pending_actions_rounded,
+                    color: _C.amber,
+                    text:
+                        '${data.pendingCount} verifications pending — visit Verify panel to take action',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

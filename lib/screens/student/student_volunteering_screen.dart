@@ -15,7 +15,6 @@ import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
 class _C {
-  static const bg = Color(0xFF080D19);
   static const card = Color(0xFF111827);
   static const primary = Color(0xFF8B5CF6);
   static const neonBlue = Color(0xFF3B82F6);
@@ -87,7 +86,7 @@ class VolunteeringOpportunity {
 class _VolunteeringService {
   static final _db = FirebaseFirestore.instance;
 
-  /// Returns Map<volunteeringId, applicationStatus> — single query, no loops.
+  /// Returns `Map<volunteeringId, applicationStatus>` — single query, no loops.
   static Future<Map<String, String>> fetchApplicationMap(String uid) async {
     if (uid.isEmpty) return {};
     final snap = await _db
@@ -156,39 +155,20 @@ Color _categoryColor(String cat) {
 class _GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsets? padding;
-  final Color? glowColor;
-  final VoidCallback? onTap;
 
-  const _GlassCard({
-    required this.child,
-    this.padding,
-    this.glowColor,
-    this.onTap,
-  });
+  const _GlassCard({required this.child, this.padding});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: padding ?? const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _C.card.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _C.border),
-        boxShadow: glowColor != null
-            ? [
-                BoxShadow(
-                  color: glowColor!.withValues(alpha: 0.18),
-                  blurRadius: 18,
-                  spreadRadius: 1,
-                ),
-              ]
-            : [],
-      ),
-      child: child,
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: padding ?? const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: _C.card.withValues(alpha: 0.75),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _C.border),
     ),
+    child: child,
   );
 }
 
@@ -833,7 +813,7 @@ class _VolunteeringFeedScreenState extends State<VolunteeringFeedScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
               itemBuilder: (ctx, i) {
                 final cat = _categories[i];
                 final isActive = _selectedCategory == cat;

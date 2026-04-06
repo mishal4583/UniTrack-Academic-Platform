@@ -278,21 +278,21 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             color: active
-                ? _primary.withOpacity(0.15)
+                ? _primary.withValues(alpha: 0.15)
                 : _hovered
-                ? _primary.withOpacity(0.07)
+                ? _primary.withValues(alpha: 0.07)
                 : Colors.transparent,
             boxShadow: active
                 ? [
                     BoxShadow(
-                      color: _primary.withOpacity(0.2),
+                      color: _primary.withValues(alpha: 0.2),
                       blurRadius: 12,
                       spreadRadius: 0,
                     ),
                   ]
                 : [],
             border: active
-                ? Border.all(color: _primary.withOpacity(0.25))
+                ? Border.all(color: _primary.withValues(alpha: 0.25))
                 : Border.all(color: Colors.transparent),
           ),
           child: Row(
@@ -309,7 +309,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                   boxShadow: active
                       ? [
                           BoxShadow(
-                            color: _primary.withOpacity(0.7),
+                            color: _primary.withValues(alpha: 0.7),
                             blurRadius: 8,
                           ),
                         ]
@@ -324,7 +324,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                 color: active
                     ? _primary
                     : _hovered
-                    ? _foreground.withOpacity(0.7)
+                    ? _foreground.withValues(alpha: 0.7)
                     : _mutedText,
               ),
 
@@ -340,7 +340,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                       color: active
                           ? _primary
                           : _hovered
-                          ? _foreground.withOpacity(0.85)
+                          ? _foreground.withValues(alpha: 0.85)
                           : _mutedText,
                     ),
                   ),
@@ -356,7 +356,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                       color: _neonCyan,
                       boxShadow: [
                         BoxShadow(
-                          color: _neonCyan.withOpacity(0.8),
+                          color: _neonCyan.withValues(alpha: 0.8),
                           blurRadius: 6,
                         ),
                       ],
@@ -409,7 +409,7 @@ class _SidebarLogoutState extends State<_SidebarLogout> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               color: _hovered
-                  ? Colors.red.withOpacity(0.08)
+                  ? Colors.red.withValues(alpha: 0.08)
                   : Colors.transparent,
             ),
             child: Row(
@@ -465,7 +465,7 @@ class _TopBar extends StatelessWidget {
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: _cardColor.withOpacity(0.55),
+            color: _cardColor.withValues(alpha: 0.55),
             border: const Border(bottom: BorderSide(color: _borderColor)),
           ),
           child: Row(
@@ -562,9 +562,9 @@ class _NetworkBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: _neonCyan.withOpacity(0.07),
+        color: _neonCyan.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _neonCyan.withOpacity(0.18)),
+        border: Border.all(color: _neonCyan.withValues(alpha: 0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -649,7 +649,7 @@ class _AvatarBadge extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: _neonPurple.withOpacity(0.35),
+            color: _neonPurple.withValues(alpha: 0.35),
             blurRadius: 8,
             spreadRadius: 0,
           ),
@@ -709,10 +709,10 @@ class _PulsingDotState extends State<_PulsingDot>
       height: 7,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: _neonCyan.withOpacity(_anim.value),
+        color: _neonCyan.withValues(alpha: _anim.value),
         boxShadow: [
           BoxShadow(
-            color: _neonCyan.withOpacity(_anim.value * 0.7),
+            color: _neonCyan.withValues(alpha: _anim.value * 0.7),
             blurRadius: 5,
             spreadRadius: 0,
           ),

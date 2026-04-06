@@ -25,7 +25,6 @@ class _C {
   static const neonCyan = Color(0xFF06B6D4);
   static const neonGreen = Color(0xFF10B981);
   static const amber = Color(0xFFF59E0B);
-  static const rose = Color(0xFFF43F5E);
   static const text = Color(0xFFEFF3F8);
   static const muted = Color(0xFF7E8A9A);
   static const border = Color(0xFF1F2937);

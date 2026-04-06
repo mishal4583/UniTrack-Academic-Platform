@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:unitrack_flutter/screens/faculty/faculty_manage_detail_screen.dart';
 import 'package:unitrack_flutter/screens/faculty/faculty_manage_screen.dart';
-import 'package:unitrack_flutter/screens/student/Student_certificates_screen.dart';
-import 'package:unitrack_flutter/screens/student/Student_profile_screen.dart';
-import 'package:unitrack_flutter/screens/student/Studentrecommendationscreen.dart';
+import 'package:unitrack_flutter/screens/student/student_certificates_screen.dart';
+import 'package:unitrack_flutter/screens/student/student_profile_screen.dart';
+import 'package:unitrack_flutter/screens/student/studentrecommendationscreen.dart';
 import 'package:unitrack_flutter/screens/student/student_my_progress_screen.dart';
 import 'firebase_options.dart';
 

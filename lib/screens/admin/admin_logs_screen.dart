@@ -334,7 +334,7 @@ class _LogsBodyState extends State<_LogsBody> {
                     Icon(
                       Icons.find_in_page_rounded,
                       size: 48,
-                      color: _mutedText.withOpacity(0.4),
+                      color: _mutedText.withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -486,7 +486,7 @@ class _LogsBodyState extends State<_LogsBody> {
                 Icon(
                   Icons.find_in_page_rounded,
                   size: 48,
-                  color: _mutedText.withOpacity(0.4),
+                  color: _mutedText.withValues(alpha: 0.4),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -516,7 +516,7 @@ class _LogsBodyState extends State<_LogsBody> {
             headingRowColor: WidgetStateProperty.all(Colors.transparent),
             dataRowColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.hovered)) {
-                return Colors.white.withOpacity(0.04);
+                return Colors.white.withValues(alpha: 0.04);
               }
               return Colors.transparent;
             }),
@@ -686,9 +686,9 @@ class _TypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -727,9 +727,9 @@ class _CertStatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -766,9 +766,9 @@ class _BlockchainBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -845,13 +845,13 @@ class _StatCardState extends State<_StatCard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: _hovered
-              ? widget.data.iconColor.withOpacity(0.4)
+              ? widget.data.iconColor.withValues(alpha: 0.4)
               : _borderColor,
         ),
         boxShadow: _hovered
             ? [
                 BoxShadow(
-                  color: widget.data.iconColor.withOpacity(0.12),
+                  color: widget.data.iconColor.withValues(alpha: 0.12),
                   blurRadius: 20,
                   spreadRadius: 1,
                 ),
@@ -923,8 +923,8 @@ class _StatCardState extends State<_StatCard> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               color: _hovered
-                  ? widget.data.iconColor.withOpacity(0.2)
-                  : widget.data.iconColor.withOpacity(0.1),
+                  ? widget.data.iconColor.withValues(alpha: 0.2)
+                  : widget.data.iconColor.withValues(alpha: 0.1),
             ),
             child: Icon(
               widget.data.icon,
@@ -954,7 +954,7 @@ class _GlassContainer extends StatelessWidget {
       child: Container(
         padding: padding,
         decoration: BoxDecoration(
-          color: _cardColor.withOpacity(0.85),
+          color: _cardColor.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _borderColor),
         ),
@@ -1005,9 +1005,9 @@ class _ErrorCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: _destructive.withOpacity(0.08),
+      color: _destructive.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: _destructive.withOpacity(0.3)),
+      border: Border.all(color: _destructive.withValues(alpha: 0.3)),
     ),
     child: Row(
       children: [
@@ -1060,7 +1060,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
     animation: _anim,
     builder: (_, __) => Container(
       decoration: BoxDecoration(
-        color: _borderColor.withOpacity(_anim.value),
+        color: _borderColor.withValues(alpha: _anim.value),
         borderRadius: BorderRadius.circular(6),
       ),
     ),

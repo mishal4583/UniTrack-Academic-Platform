@@ -159,15 +159,17 @@ class _GlassCard extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 16),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(
-        color: glowColor != null ? glowColor!.withOpacity(0.4) : _C.border,
+        color: glowColor != null
+            ? glowColor!.withValues(alpha: 0.4)
+            : _C.border,
       ),
       boxShadow: glowColor != null
           ? [
               BoxShadow(
-                color: glowColor!.withOpacity(0.18),
+                color: glowColor!.withValues(alpha: 0.18),
                 blurRadius: 18,
                 spreadRadius: 1,
               ),
@@ -208,9 +210,9 @@ class _BlockchainBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -275,7 +277,7 @@ class _StatStrip extends StatelessWidget {
               margin: EdgeInsets.only(left: i == 0 ? 0 : gap),
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
               decoration: BoxDecoration(
-                color: _C.card.withOpacity(0.75),
+                color: _C.card.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: _C.border),
               ),
@@ -502,9 +504,9 @@ class _RecentActivities extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _C.secondary.withOpacity(0.5),
+                color: _C.secondary.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _C.border.withOpacity(0.5)),
+                border: Border.all(color: _C.border.withValues(alpha: 0.5)),
               ),
               child: Row(
                 children: [
@@ -512,7 +514,7 @@ class _RecentActivities extends StatelessWidget {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: _typeColor(a.type).withOpacity(0.1),
+                      color: _typeColor(a.type).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(

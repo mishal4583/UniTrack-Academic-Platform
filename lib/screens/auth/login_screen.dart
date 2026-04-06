@@ -85,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: card.withOpacity(0.6),
+                          color: card.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: glassBorder),
                         ),
@@ -164,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           color: selected ? primary : border,
                                         ),
                                         color: selected
-                                            ? primary.withOpacity(0.1)
+                                            ? primary.withValues(alpha: 0.1)
                                             : const Color(0xFF151E2C),
                                       ),
                                       child: Column(
@@ -253,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: glassBorder),
-                                color: card.withOpacity(0.6),
+                                color: card.withValues(alpha: 0.6),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -378,7 +378,7 @@ class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF1F2937).withOpacity(0.3)
+      ..color = const Color(0xFF1F2937).withValues(alpha: 0.3)
       ..strokeWidth = 1;
 
     const step = 40.0;

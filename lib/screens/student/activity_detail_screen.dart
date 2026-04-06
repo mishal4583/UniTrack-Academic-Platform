@@ -64,7 +64,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   _activity; // initial model from route args (for id + static fields)
   String _userName = '';
   String _uid = '';
-  String? _enrollmentId;
   String? _enrollmentStatus; // null = not enrolled
   bool _loadingEnr = true;
   bool _enrolling = false;
@@ -119,7 +118,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
       setState(() {
         _userName = name;
-        _enrollmentId = enrId;
         _enrollmentStatus = enrSt;
         _loadingEnr = false;
       });
@@ -197,7 +195,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
       if (!mounted) return;
       setState(() {
-        _enrollmentId = newEnrId;
         _enrollmentStatus = 'Enrolled';
         _enrolling = false;
       });

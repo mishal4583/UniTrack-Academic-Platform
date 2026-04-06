@@ -17,7 +17,6 @@ import 'faculty_dashboard_layout.dart';
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
 class _C {
-  static const bg = Color(0xFF080D19);
   static const card = Color(0xFF111827);
   static const primary = Color(0xFF8B5CF6);
   static const neonBlue = Color(0xFF3B82F6);
@@ -164,7 +163,7 @@ class _SectionCard extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 14),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
     ),
@@ -180,7 +179,7 @@ Widget _sectionHeader(String title, IconData icon, Color color) => Padding(
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 16),
@@ -231,7 +230,7 @@ class _Toggle extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
+            color: iconColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: iconColor, size: 18),
@@ -372,10 +371,12 @@ class _VerifyTypeSelector extends StatelessWidget {
                 : EdgeInsets.zero,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isActive ? _C.primary.withOpacity(0.1) : _C.secondary,
+              color: isActive
+                  ? _C.primary.withValues(alpha: 0.1)
+                  : _C.secondary,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isActive ? _C.primary.withOpacity(0.5) : _C.border,
+                color: isActive ? _C.primary.withValues(alpha: 0.5) : _C.border,
               ),
             ),
             child: Center(
@@ -456,7 +457,7 @@ class _FacultyCreateVolunteeringScreenState
               fontWeight: FontWeight.w600,
             ),
           ),
-          backgroundColor: color.withOpacity(0.9),
+          backgroundColor: color.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

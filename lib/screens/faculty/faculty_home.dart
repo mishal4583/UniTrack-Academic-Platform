@@ -253,13 +253,13 @@ class _Card extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 12),
     padding: padding ?? const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
       boxShadow: glowColor != null
           ? [
               BoxShadow(
-                color: glowColor!.withOpacity(0.2),
+                color: glowColor!.withValues(alpha: 0.2),
                 blurRadius: 18,
                 spreadRadius: 1,
               ),
@@ -300,9 +300,9 @@ class _BlockchainBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -386,9 +386,9 @@ class _SmallButton extends StatelessWidget {
       height: 30,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Center(
         child: Text(
@@ -425,7 +425,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
     ),
@@ -454,7 +454,7 @@ class _StatCard extends StatelessWidget {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: iconColor, size: 15),
@@ -615,9 +615,11 @@ class _QuickActions extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color: a.color.withOpacity(0.1),
+                            color: a.color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: a.color.withOpacity(0.3)),
+                            border: Border.all(
+                              color: a.color.withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -713,7 +715,7 @@ class _RecentActivities extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: _C.secondary.withOpacity(0.5),
+            color: _C.secondary.withValues(alpha: 0.5),
             border: const Border(
               top: BorderSide(color: _C.border),
               bottom: BorderSide(color: _C.border),
@@ -1002,8 +1004,8 @@ class _PendingVerificationsState extends State<_PendingVerifications> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: row.type == 'activity'
-                                      ? _C.primary.withOpacity(0.1)
-                                      : _C.neonGreen.withOpacity(0.1),
+                                      ? _C.primary.withValues(alpha: 0.1)
+                                      : _C.neonGreen.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -1108,9 +1110,9 @@ class _VolunteeringRequests extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _C.secondary.withOpacity(0.5),
+                color: _C.secondary.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _C.border.withOpacity(0.5)),
+                border: Border.all(color: _C.border.withValues(alpha: 0.5)),
               ),
               child: Row(
                 children: [
@@ -1144,8 +1146,8 @@ class _VolunteeringRequests extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: row.status == 'full'
-                          ? _C.muted.withOpacity(0.1)
-                          : _C.neonGreen.withOpacity(0.1),
+                          ? _C.muted.withValues(alpha: 0.1)
+                          : _C.neonGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -1178,7 +1180,7 @@ class _SmartContractCard extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: _C.neonCyan.withOpacity(0.1),
+            color: _C.neonCyan.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(Icons.bolt_rounded, color: _C.neonCyan, size: 22),
@@ -1303,7 +1305,10 @@ class _MiniAnalytics extends StatelessWidget {
                             child: Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [b.color, b.color.withOpacity(0.6)],
+                                  colors: [
+                                    b.color,
+                                    b.color.withValues(alpha: 0.6),
+                                  ],
                                 ),
                               ),
                             ),

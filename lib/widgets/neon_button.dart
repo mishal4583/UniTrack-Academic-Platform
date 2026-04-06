@@ -18,7 +18,10 @@ class NeonButton extends StatelessWidget {
             colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
           ),
           boxShadow: [
-            BoxShadow(color: Colors.purple.withOpacity(0.4), blurRadius: 20),
+            BoxShadow(
+              color: Colors.purple.withValues(alpha: 0.4),
+              blurRadius: 20,
+            ),
           ],
         ),
         alignment: Alignment.center,

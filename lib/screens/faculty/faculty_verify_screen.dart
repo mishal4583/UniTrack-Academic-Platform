@@ -426,7 +426,7 @@ class _FacultyVerifyScreenState extends State<FacultyVerifyScreen> {
             Container(
               height: 44,
               decoration: BoxDecoration(
-                color: _C.card.withOpacity(0.7),
+                color: _C.card.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: _C.border),
               ),
@@ -491,9 +491,11 @@ class _FacultyVerifyScreenState extends State<FacultyVerifyScreen> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: _tab.color.withOpacity(0.1),
+                    color: _tab.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _tab.color.withOpacity(0.3)),
+                    border: Border.all(
+                      color: _tab.color.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Text(
                     '${filtered.length}',
@@ -570,7 +572,7 @@ class _SummaryStrip extends StatelessWidget {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: _C.card.withOpacity(0.75),
+                  color: _C.card.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: _C.border),
                 ),
@@ -645,11 +647,11 @@ class _TabBar extends StatelessWidget {
               margin: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 color: isActive
-                    ? t.color.withOpacity(0.15)
+                    ? t.color.withValues(alpha: 0.15)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(9),
                 border: isActive
-                    ? Border.all(color: t.color.withOpacity(0.4))
+                    ? Border.all(color: t.color.withValues(alpha: 0.4))
                     : null,
               ),
               child: Row(
@@ -673,7 +675,9 @@ class _TabBar extends StatelessWidget {
                         vertical: 1,
                       ),
                       decoration: BoxDecoration(
-                        color: isActive ? t.color.withOpacity(0.25) : _C.border,
+                        color: isActive
+                            ? t.color.withValues(alpha: 0.25)
+                            : _C.border,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -733,7 +737,7 @@ class _TrackCardState extends State<_TrackCard> {
               'Error: $e',
               style: const TextStyle(color: Colors.white),
             ),
-            backgroundColor: _C.rose.withOpacity(0.9),
+            backgroundColor: _C.rose.withValues(alpha: 0.9),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -764,7 +768,7 @@ class _TrackCardState extends State<_TrackCard> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _C.card.withOpacity(0.75),
+        color: _C.card.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _C.border),
       ),
@@ -848,9 +852,9 @@ class _TrackCardState extends State<_TrackCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: tColor.withOpacity(0.1),
+                  color: tColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: tColor.withOpacity(0.4)),
+                  border: Border.all(color: tColor.withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   item.itemType,
@@ -955,10 +959,10 @@ class _TrackCardState extends State<_TrackCard> {
                           child: Container(
                             height: 38,
                             decoration: BoxDecoration(
-                              color: _C.rose.withOpacity(0.1),
+                              color: _C.rose.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: _C.rose.withOpacity(0.5),
+                                color: _C.rose.withValues(alpha: 0.5),
                               ),
                             ),
                             child: const Row(
@@ -991,7 +995,7 @@ class _TrackCardState extends State<_TrackCard> {
                 Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: _C.neonBlue.withOpacity(0.1),
+                    color: _C.neonBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
@@ -1017,7 +1021,7 @@ class _TrackCardState extends State<_TrackCard> {
                 Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: _C.neonGreen.withOpacity(0.1),
+                    color: _C.neonGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
@@ -1115,7 +1119,7 @@ class _EmptyTabBox extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
     decoration: BoxDecoration(
-      color: _C.card.withOpacity(0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: _C.border),
     ),
@@ -1129,7 +1133,7 @@ class _EmptyTabBox extends StatelessWidget {
               ? Icons.task_alt_rounded
               : Icons.check_circle_outline_rounded,
           size: 48,
-          color: tab.color.withOpacity(0.5),
+          color: tab.color.withValues(alpha: 0.5),
         ),
         const SizedBox(height: 16),
         Text(
