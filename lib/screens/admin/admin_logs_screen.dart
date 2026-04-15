@@ -1058,7 +1058,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _anim,
-    builder: (_, __) => Container(
+    builder: (_, _) => Container(
       decoration: BoxDecoration(
         color: _borderColor.withValues(alpha: _anim.value),
         borderRadius: BorderRadius.circular(6),
