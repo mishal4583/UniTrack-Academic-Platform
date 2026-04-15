@@ -704,7 +704,7 @@ class _PulsingDotState extends State<_PulsingDot>
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _anim,
-    builder: (_, __) => Container(
+    builder: (_, _) => Container(
       width: 7,
       height: 7,
       decoration: BoxDecoration(

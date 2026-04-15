@@ -285,8 +285,9 @@ class _UsersBodyState extends State<_UsersBody> {
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(Colors.transparent),
             dataRowColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.hovered))
+              if (states.contains(WidgetState.hovered)) {
                 return _borderColor.withValues(alpha: 0.5);
+              }
               return Colors.transparent;
             }),
             dividerThickness: 0.5,
@@ -404,12 +405,13 @@ class _UsersBodyState extends State<_UsersBody> {
       await FirebaseFirestore.instance.collection('users').doc(user.id).update({
         'isActive': !user.isActive,
       });
-      if (context.mounted)
+      if (context.mounted) {
         _showSnack(
           context,
           user.isActive ? 'User disabled.' : 'User enabled.',
           success: true,
         );
+      }
     } catch (e) {
       if (context.mounted) _showSnack(context, 'Error: $e', success: false);
     }
@@ -430,8 +432,9 @@ class _UsersBodyState extends State<_UsersBody> {
             .collection('users')
             .doc(user.id)
             .delete();
-        if (context.mounted)
+        if (context.mounted) {
           _showSnack(context, '${user.name} deleted.', success: true);
+        }
       } catch (e) {
         if (context.mounted) _showSnack(context, 'Error: $e', success: false);
       }
@@ -1205,7 +1208,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _anim,
-    builder: (_, __) => Container(
+    builder: (_, _) => Container(
       decoration: BoxDecoration(
         color: _borderColor.withValues(alpha: _anim.value),
         borderRadius: BorderRadius.circular(6),

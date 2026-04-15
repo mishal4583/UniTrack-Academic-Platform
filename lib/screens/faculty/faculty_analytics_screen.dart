@@ -119,9 +119,9 @@ class _AnalyticsService {
       final u = (d['userId'] as String?) ?? '';
       if (u.isNotEmpty) studentSet.add(u);
       final s = (d['status'] as String?) ?? '';
-      if (s == 'Verified' || s == 'Completed')
+      if (s == 'Verified' || s == 'Completed') {
         verified++;
-      else if (s == 'Enrolled')
+      } else if (s == 'Enrolled')
         pending++;
     }
     for (final doc in appSnap.docs) {
@@ -130,9 +130,9 @@ class _AnalyticsService {
       final u = (d['userId'] as String?) ?? '';
       if (u.isNotEmpty) studentSet.add(u);
       final s = (d['status'] as String?) ?? '';
-      if (s == 'Verified' || s == 'Completed')
+      if (s == 'Verified' || s == 'Completed') {
         verified++;
-      else if (s == 'Applied')
+      } else if (s == 'Applied')
         pending++;
     }
 
@@ -677,7 +677,7 @@ class _CreditTrendChart extends StatelessWidget {
                     barWidth: 2.5,
                     dotData: FlDotData(
                       show: true,
-                      getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                      getDotPainter: (_, _, _, _) => FlDotCirclePainter(
                         radius: 4,
                         color: _C.neonGreen,
                         strokeColor: _C.bg,
