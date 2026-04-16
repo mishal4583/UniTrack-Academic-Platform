@@ -30,6 +30,34 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AI MATCHING CATALOGUES  (must match Studentrecommendationscreen catalogues)
+// ─────────────────────────────────────────────────────────────────────────────
+const List<String> _kSkills = [
+  'Flutter', 'Python', 'Machine Learning', 'Data Science',
+  'Web Development', 'Java', 'C++', 'JavaScript', 'React',
+  'Node.js', 'Blockchain', 'UI/UX Design', 'Figma',
+  'Content Writing', 'Public Speaking', 'Research',
+  'Data Analysis', 'Cybersecurity', 'Cloud Computing',
+  'DevOps', 'Android Development', 'IoT', 'Embedded Systems',
+  'Database Management', 'Marketing', 'Finance',
+  'Business Strategy', 'Molecular Biology', 'Bioinformatics',
+  'Lab Research', 'Graphic Design', 'Video Editing',
+];
+
+const List<String> _kInterests = [
+  'Technology', 'Research & Innovation', 'Entrepreneurship',
+  'Community Service', 'Environmental Sustainability',
+  'Finance & Economics', 'Healthcare & Wellness',
+  'Creative Arts', 'Data & Analytics', 'Artificial Intelligence',
+  'Open Source', 'Social Impact', 'Education',
+  'Business & Strategy', 'Cybersecurity', 'Blockchain & Web3',
+  'Design & Creativity', 'Science & Engineering',
+  'Public Speaking & Debate', 'Mental Health & Wellbeing',
+  'Sports & Fitness', 'Cultural Activities', 'Networking',
+  'Leadership', 'Writing & Journalism', 'Film & Media',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SHARED FORM WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 class _FieldLabel extends StatelessWidget {
@@ -378,6 +406,37 @@ class _FacultyCreateActivityScreenState
   DateTime? _startDate;
   DateTime? _endDate;
 
+  List<String> _selectedSkills = [];
+  List<String> _selectedCategoryTags = [];
+
+  void _toggleSkill(String s) => setState(() {
+    _selectedSkills.contains(s) ? _selectedSkills.remove(s) : _selectedSkills.add(s);
+  });
+  void _toggleTag(String t) => setState(() {
+    _selectedCategoryTags.contains(t) ? _selectedCategoryTags.remove(t) : _selectedCategoryTags.add(t);
+  });
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: selected ? _C.primary.withValues(alpha: 0.15) : Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: selected ? _C.primary : _C.border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? _C.primary : _C.muted,
+          fontSize: 11,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    ),
+  );
+
   static const _types = [
     'Workshop',
     'Seminar',
@@ -532,6 +591,9 @@ class _FacultyCreateActivityScreenState
         'duration': duration,
         'location': _locationCtrl.text.trim(),
         'blockchainVerified': _blockchainCert,
+        'required_skills': _selectedSkills,
+        'category_tags': _selectedCategoryTags,
+        'target_departments': <String>[],
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -739,6 +801,45 @@ class _FacultyCreateActivityScreenState
               _TF(
                 controller: _locationCtrl,
                 hint: 'e.g. Auditorium Block A, Room 301',
+              ),
+            ],
+          ),
+        ),
+
+        // ── AI Matching Tags ──────────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sectionHeader(
+                'AI Matching Tags',
+                Icons.auto_awesome_rounded,
+                _C.amber,
+              ),
+              const Text(
+                'Tag this activity so the recommendation engine surfaces it to the right students.',
+                style: TextStyle(color: _C.muted, fontSize: 11),
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Required Skills'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _kSkills
+                    .map((s) => _chip(s, _selectedSkills.contains(s), () => _toggleSkill(s)))
+                    .toList(),
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Interest Categories'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _kInterests
+                    .map((t) => _chip(t, _selectedCategoryTags.contains(t), () => _toggleTag(t)))
+                    .toList(),
               ),
             ],
           ),
