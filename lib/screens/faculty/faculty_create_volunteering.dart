@@ -30,6 +30,34 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AI MATCHING CATALOGUES  (must match Studentrecommendationscreen catalogues)
+// ─────────────────────────────────────────────────────────────────────────────
+const List<String> _kSkills = [
+  'Flutter', 'Python', 'Machine Learning', 'Data Science',
+  'Web Development', 'Java', 'C++', 'JavaScript', 'React',
+  'Node.js', 'Blockchain', 'UI/UX Design', 'Figma',
+  'Content Writing', 'Public Speaking', 'Research',
+  'Data Analysis', 'Cybersecurity', 'Cloud Computing',
+  'DevOps', 'Android Development', 'IoT', 'Embedded Systems',
+  'Database Management', 'Marketing', 'Finance',
+  'Business Strategy', 'Molecular Biology', 'Bioinformatics',
+  'Lab Research', 'Graphic Design', 'Video Editing',
+];
+
+const List<String> _kInterests = [
+  'Technology', 'Research & Innovation', 'Entrepreneurship',
+  'Community Service', 'Environmental Sustainability',
+  'Finance & Economics', 'Healthcare & Wellness',
+  'Creative Arts', 'Data & Analytics', 'Artificial Intelligence',
+  'Open Source', 'Social Impact', 'Education',
+  'Business & Strategy', 'Cybersecurity', 'Blockchain & Web3',
+  'Design & Creativity', 'Science & Engineering',
+  'Public Speaking & Debate', 'Mental Health & Wellbeing',
+  'Sports & Fitness', 'Cultural Activities', 'Networking',
+  'Leadership', 'Writing & Journalism', 'Film & Media',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FORM WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 class _FieldLabel extends StatelessWidget {
@@ -412,7 +440,6 @@ class _FacultyCreateVolunteeringScreenState
     extends State<FacultyCreateVolunteeringScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final _skillsCtrl = TextEditingController();
   final _orgCtrl = TextEditingController();
   final _creditCtrl = TextEditingController();
   final _durCtrl = TextEditingController();
@@ -422,6 +449,37 @@ class _FacultyCreateVolunteeringScreenState
   String _verifyType = 'Faculty Approval';
   bool _blockchainCert = true;
   bool _loading = false;
+
+  List<String> _selectedSkills = [];
+  List<String> _selectedCategoryTags = [];
+
+  void _toggleSkill(String s) => setState(() {
+    _selectedSkills.contains(s) ? _selectedSkills.remove(s) : _selectedSkills.add(s);
+  });
+  void _toggleTag(String t) => setState(() {
+    _selectedCategoryTags.contains(t) ? _selectedCategoryTags.remove(t) : _selectedCategoryTags.add(t);
+  });
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: selected ? _C.primary.withValues(alpha: 0.15) : Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: selected ? _C.primary : _C.border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? _C.primary : _C.muted,
+          fontSize: 11,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    ),
+  );
 
   static const _categories = [
     'Academic Support',
@@ -436,7 +494,6 @@ class _FacultyCreateVolunteeringScreenState
     for (final c in [
       _titleCtrl,
       _descCtrl,
-      _skillsCtrl,
       _orgCtrl,
       _creditCtrl,
       _durCtrl,
@@ -521,11 +578,7 @@ class _FacultyCreateVolunteeringScreenState
     setState(() => _loading = true);
 
     try {
-      final skillsList = _skillsCtrl.text
-          .split(',')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
+      final skillsList = _selectedSkills;
       final now = DateTime.now();
       final dateStr = '${_monthName(now.month)} ${now.year}';
 
@@ -537,6 +590,8 @@ class _FacultyCreateVolunteeringScreenState
             ? 'General'
             : _orgCtrl.text.trim(),
         'skills': skillsList,
+        'category_tags': _selectedCategoryTags,
+        'target_departments': <String>[],
         'credits': credits,
         'duration': _durCtrl.text.trim(),
         'maxParticipants': maxP,
@@ -692,23 +747,48 @@ class _FacultyCreateVolunteeringScreenState
                           ],
                         ),
                       ),
-                      SizedBox(
-                        width: w,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const _FieldLabel('Required Skills'),
-                            _TF(
-                              controller: _skillsCtrl,
-                              hint: 'e.g. Leadership, Python',
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   );
                 },
+              ),
+            ],
+          ),
+        ),
+
+        // ── AI Matching Tags ──────────────────────────────────────────────────
+        _SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sectionHeader(
+                'AI Matching Tags',
+                Icons.auto_awesome_rounded,
+                _C.amber,
+              ),
+              const Text(
+                'Tag this opportunity so the recommendation engine surfaces it to the right students.',
+                style: TextStyle(color: _C.muted, fontSize: 11),
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Required Skills'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _kSkills
+                    .map((s) => _chip(s, _selectedSkills.contains(s), () => _toggleSkill(s)))
+                    .toList(),
+              ),
+              const SizedBox(height: 14),
+              const _FieldLabel('Interest Categories'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _kInterests
+                    .map((t) => _chip(t, _selectedCategoryTags.contains(t), () => _toggleTag(t)))
+                    .toList(),
               ),
             ],
           ),
