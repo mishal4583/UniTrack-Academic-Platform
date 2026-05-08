@@ -16,6 +16,7 @@ import 'package:unitrack_flutter/screens/auth/register_screen.dart';
 import 'package:unitrack_flutter/screens/student/student_home.dart';
 import 'package:unitrack_flutter/screens/student/student_volunteering_screen.dart';
 import 'package:unitrack_flutter/screens/student/student_activities_screen.dart';
+import 'package:unitrack_flutter/screens/student/activity_detail_screen.dart';
 
 // FACULTY
 import 'package:unitrack_flutter/screens/faculty/faculty_home.dart';
@@ -30,6 +31,7 @@ import 'package:unitrack_flutter/screens/admin/admin_dashboard_screen.dart';
 import 'package:unitrack_flutter/screens/admin/admin_users_screen.dart';
 import 'package:unitrack_flutter/screens/admin/admin_content_screen.dart';
 import 'package:unitrack_flutter/screens/admin/admin_logs_screen.dart';
+import 'package:unitrack_flutter/screens/admin/admin_settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +66,7 @@ class MyApp extends StatelessWidget {
         '/student': (ctx) => const StudentHome(),
         '/student/volunteering': (ctx) => const VolunteeringFeedScreen(),
         '/student/activities': (ctx) => const StudentActivitiesScreen(),
+        '/student/activity-detail': (ctx) => const ActivityDetailScreen(),
         '/student/my-progress': (ctx) => const StudentMyProgressScreen(),
         '/student/profile': (ctx) => const StudentProfileScreen(),
         '/student/certificates': (ctx) => const StudentCertificatesScreen(),
@@ -92,7 +95,7 @@ class MyApp extends StatelessWidget {
         // mapped to AdminContentScreen
         '/admin/blockchain': (ctx) =>
             const AdminLogsScreen(), // mapped to AdminLogsScreen
-        '/admin/settings': (ctx) => const _Placeholder(title: 'Admin Settings'),
+        '/admin/settings': (ctx) => const AdminSettingsScreen(),
 
         // Legacy routes kept for backward compatibility
         '/admin/content': (ctx) =>

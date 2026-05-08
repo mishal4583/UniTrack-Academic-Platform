@@ -17,6 +17,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
 import 'student_activities_screen.dart' show ActivityModel;
@@ -128,85 +129,34 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     }
   }
 
-  // ── Task 1: Transaction-safe enroll ─────────────────────────────────────────
+  // ── Enroll via Cloud Function (admin SDK bypasses Firestore rules) ──────────
   Future<void> _enroll() async {
     if (_activity == null || _uid.isEmpty) return;
-    setState(() => _enrolling = true);
+    _enrolling = true;
+    setState(() {});
 
     try {
-      final db = FirebaseFirestore.instance;
-      final actRef = db.collection('activities').doc(_activity!.id);
-      final enrColRef = db.collection('enrollments');
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('enrollActivity');
 
-      // TRANSACTION — prevents overbooking / race conditions
-      String? newEnrId;
-      await db.runTransaction((txn) async {
-        final actSnap = await txn.get(actRef);
-
-        final data = actSnap.data() as Map<String, dynamic>;
-
-        final enrolled = (data['enrolled'] as int?) ?? 0;
-        final capacity = (data['capacity'] as int?) ?? 0;
-        final status = (data['status'] as String?) ?? 'open';
-
-        // ✅ ADD HERE
-        if (capacity <= 0) {
-          throw Exception('Invalid capacity');
-        }
-
-        // ✅ ADD HERE
-        final existing = await FirebaseFirestore.instance
-            .collection('enrollments')
-            .where('userId', isEqualTo: _uid)
-            .where('activityId', isEqualTo: _activity!.id)
-            .limit(1)
-            .get();
-
-        if (existing.docs.isNotEmpty) {
-          throw Exception('Already enrolled');
-        }
-
-        // existing full check (keep it)
-        if (status == 'full' || enrolled >= capacity) {
-          throw Exception('Activity is fully booked');
-        }
-
-        // Create new enrollment document ref (can't use .add() inside txn)
-        final newEnrRef = enrColRef.doc();
-        newEnrId = newEnrRef.id;
-
-        txn.set(newEnrRef, {
-          'userId': _uid,
-          'activityId': _activity!.id,
-          'status': 'Enrolled', // Task 5: 'Enrolled' not 'enrolled'
-          'appliedAt': FieldValue.serverTimestamp(),
-        });
-
-        final newEnrolled = enrolled + 1;
-        final Map<String, dynamic> actUpdate = {
-          'enrolled': FieldValue.increment(1),
-        };
-        // Task 1: set full when last spot taken
-        if (newEnrolled >= capacity) {
-          actUpdate['status'] = 'full'; // Task 5: 'full'
-        }
-        txn.update(actRef, actUpdate);
-      });
+      await callable.call({'activityId': _activity!.id});
 
       if (!mounted) return;
-      setState(() {
-        _enrollmentStatus = 'Enrolled';
-        _enrolling = false;
-      });
+      _enrollmentStatus = 'Enrolled';
+      _enrolling = false;
+      setState(() {});
       _snack('Enrolled successfully! 🎉', _C.neonGreen);
-    } on FirebaseException catch (e) {
+    } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
-      setState(() => _enrolling = false);
-      _snack('Error: ${e.message}', Colors.redAccent);
+      _enrolling = false;
+      setState(() {});
+      final msg = e.message ?? 'Enrollment failed';
+      _snack(msg, Colors.redAccent);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _enrolling = false);
-      _snack(e.toString().replaceAll('Exception: ', ''), Colors.redAccent);
+      _enrolling = false;
+      setState(() {});
+      _snack(e.toString(), Colors.redAccent);
     }
   }
 

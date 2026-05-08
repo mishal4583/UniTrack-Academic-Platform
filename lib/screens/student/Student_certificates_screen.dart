@@ -3,15 +3,15 @@
 //
 // DATA FLOW:
 //   1. Query certificates where userId == currentUser.uid
-//   2. Split itemIds into two sets: activityIds, volunteeringIds
+//   2. Split itemIds into two sets: activityIds, volunteeringIds (by type field)
 //   3. Batch-fetch activities + volunteering using whereIn (max 30 per call)
 //   4. Map itemId → title for each certificate
 //   (No N+1 queries — all secondary fetches are batched in parallel)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS  (matches existing student dark theme)
@@ -38,6 +38,9 @@ class Certificate {
   final int credits;
   final String title; // resolved from activities / volunteering
   final String? blockchainHash;
+  final int rating;
+  final String feedback;
+  final String? transactionHash;
   final DateTime? createdAt;
 
   const Certificate({
@@ -48,6 +51,9 @@ class Certificate {
     required this.status,
     required this.credits,
     required this.title,
+    required this.rating,
+    required this.feedback,
+    this.transactionHash,
     this.blockchainHash,
     this.createdAt,
   });
@@ -92,7 +98,7 @@ class _CertService {
 
     if (certSnap.docs.isEmpty) return [];
 
-    // ── Step 2: split itemIds by type ─────────────────────────────────────────
+    // ── Step 2: split itemIds by type ────────────────────────────────────────
     final activityIds = <String>[];
     final volunteeringIds = <String>[];
 
@@ -101,12 +107,15 @@ class _CertService {
       final itemId = (d['itemId'] as String?) ?? '';
       final type = (d['type'] as String?) ?? '';
       if (itemId.isEmpty) continue;
-      if (type == 'activity') activityIds.add(itemId);
-      if (type == 'volunteering') volunteeringIds.add(itemId);
+      if (type == 'volunteering') {
+        volunteeringIds.add(itemId);
+      } else {
+        activityIds.add(itemId);
+      }
     }
 
-    // ── Step 3: batch-fetch in parallel ───────────────────────────────────────
-    final futures = await Future.wait([
+    // ── Step 3: batch-fetch activities + volunteering in parallel ─────────────
+    final results = await Future.wait([
       activityIds.isNotEmpty
           ? _batchByIds('activities', activityIds.toSet().toList())
           : Future.value(<String, Map<String, dynamic>>{}),
@@ -114,21 +123,22 @@ class _CertService {
           ? _batchByIds('volunteering', volunteeringIds.toSet().toList())
           : Future.value(<String, Map<String, dynamic>>{}),
     ]);
-    final actMap = futures[0];
-    final volMap = futures[1];
+    final actMap = results[0];
+    final volMap = results[1];
 
     // ── Step 4: assemble certificates ─────────────────────────────────────────
     final certs = certSnap.docs.map((doc) {
       final d = _safe(doc);
+
       final itemId = (d['itemId'] as String?) ?? '';
       final type = (d['type'] as String?) ?? 'activity';
-      final itemMap = type == 'activity' ? actMap : volMap;
-      final item = itemMap[itemId] ?? {};
-      final title =
-          (item['title'] as String?) ??
-          (type == 'activity' ? 'Activity' : 'Volunteering');
+      final item = (type == 'volunteering' ? volMap[itemId] : actMap[itemId]) ?? {};
+
+      final title = (item['title'] as String?) ??
+          (type == 'volunteering' ? 'Volunteering' : 'Activity');
 
       final ts = d['createdAt'];
+
       return Certificate(
         docId: doc.id,
         userId: uid,
@@ -137,12 +147,15 @@ class _CertService {
         status: (d['status'] as String?) ?? 'issued',
         credits: (d['credits'] as int?) ?? 0,
         blockchainHash: (d['blockchainHash'] as String?),
+        rating: (d['rating'] as int?) ?? 0,
+        feedback: (d['feedback'] as String?) ?? '',
+        transactionHash: (d['transactionHash'] as String?),
         title: title,
         createdAt: ts is Timestamp ? ts.toDate() : null,
       );
     }).toList();
 
-    // Sort: most recent first
+    // ── Sort: most recent first ───────────────────────────────────────────────
     certs.sort((a, b) {
       if (a.createdAt == null && b.createdAt == null) return 0;
       if (a.createdAt == null) return 1;

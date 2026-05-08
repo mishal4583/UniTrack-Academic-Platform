@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:unitrack_flutter/screens/admin/admin_dashboard_layout.dart';
@@ -30,6 +31,7 @@ class _LogEntry {
   final String status;
   final Timestamp? createdAt;
   final String? blockchainHash;
+  final String? transactionHash;
   final String studentName;
   final String studentEmail;
   final String itemTitle;
@@ -43,6 +45,7 @@ class _LogEntry {
     required this.status,
     required this.createdAt,
     required this.blockchainHash,
+    required this.transactionHash,
     required this.studentName,
     required this.studentEmail,
     required this.itemTitle,
@@ -58,7 +61,7 @@ class AdminLogsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AdminDashboardLayout(
-      pageTitle: 'Verification Logs',
+      pageTitle: 'Blockchain Monitor',
       child: const _LogsBody(),
     );
   }
@@ -187,6 +190,7 @@ class _LogsBodyState extends State<_LogsBody> {
         status: (d['status'] as String? ?? 'issued').trim(),
         createdAt: d['createdAt'] as Timestamp?,
         blockchainHash: d['blockchainHash'] as String?,
+        transactionHash: d['transactionHash'] as String?,
         studentName: (user?['name'] as String?)?.trim() ?? 'Unknown User',
         studentEmail: (user?['email'] as String?)?.trim() ?? '',
         itemTitle: (item?['title'] as String?)?.trim() ?? 'Unknown Item',
@@ -365,7 +369,7 @@ class _LogsBodyState extends State<_LogsBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: const [
         Text(
-          'Verification Logs',
+          'Blockchain Certificate Monitor',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -374,7 +378,7 @@ class _LogsBodyState extends State<_LogsBody> {
         ),
         SizedBox(height: 4),
         Text(
-          'Audit trail of all verified activities and volunteering',
+          'Live blockchain transaction log for all issued certificates',
           style: TextStyle(fontSize: 13, color: _mutedText),
         ),
       ],
@@ -532,7 +536,8 @@ class _LogsBodyState extends State<_LogsBody> {
               DataColumn(label: _TableHeader('Type')),
               DataColumn(label: _TableHeader('Credits')),
               DataColumn(label: _TableHeader('Status')),
-              DataColumn(label: _TableHeader('Blockchain')),
+              DataColumn(label: _TableHeader('Tx Hash')),
+              DataColumn(label: _TableHeader('Cert Hash')),
               DataColumn(label: _TableHeader('Date')),
             ],
             rows: entries.map((e) => _buildRow(e)).toList(),
@@ -635,8 +640,11 @@ class _LogsBodyState extends State<_LogsBody> {
         // Status badge
         DataCell(_CertStatusBadge(status: e.status)),
 
-        // Blockchain badge
-        DataCell(_BlockchainBadge(hash: e.blockchainHash)),
+        // Transaction hash
+        DataCell(_HashCell(hash: e.transactionHash, isTransaction: true)),
+
+        // Certificate hash
+        DataCell(_HashCell(hash: e.blockchainHash, isTransaction: false)),
 
         // Date
         DataCell(
@@ -718,8 +726,7 @@ class _CertStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // FIX 2: Firestore stores 'issued' as the completed/verified status
-    final isVerified = status.toLowerCase() == 'issued';
+    final isVerified = status.toLowerCase() == 'verified';
     final color = isVerified ? _neonCyan : _neonYellow;
     final label = status.isNotEmpty
         ? status[0].toUpperCase() + status.substring(1)
@@ -795,6 +802,66 @@ class _BlockchainBadge extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+
+// ─────────────────────────────────────────────
+// HASH CELL — truncated hash with copy button
+// ─────────────────────────────────────────────
+class _HashCell extends StatelessWidget {
+  final String? hash;
+  final bool isTransaction;
+  const _HashCell({this.hash, required this.isTransaction});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasHash = hash != null && hash!.isNotEmpty;
+    if (!hasHash) {
+      return const Text('—', style: TextStyle(fontSize: 12, color: _mutedText));
+    }
+    final short = hash!.length > 12
+        ? '${hash!.substring(0, 6)}...${hash!.substring(hash!.length - 4)}'
+        : hash!;
+    final color = isTransaction ? _neonBlue : _neonCyan;
+    return GestureDetector(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: hash!));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Hash copied to clipboard'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tag_rounded, size: 10, color: color),
+            const SizedBox(width: 4),
+            Text(
+              short,
+              style: TextStyle(
+                fontSize: 11,
+                fontFamily: 'monospace',
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.copy_rounded, size: 10, color: _mutedText),
+          ],
+        ),
       ),
     );
   }

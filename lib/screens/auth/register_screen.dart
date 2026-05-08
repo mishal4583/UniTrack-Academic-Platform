@@ -1,7 +1,8 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:unitrack_flutter/screens/auth/login_screen.dart';
 
 class RoleModel {
@@ -363,15 +364,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Column(
       children: [
         Container(
-          width: 64,
-          height: 64,
+          width: 120,
+          height: 120,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: const LinearGradient(colors: [primary, neonBlue]),
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              colors: [primary, neonBlue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primary.withValues(alpha: 0.4),
+                blurRadius: 30,
+                spreadRadius: 2,
+              ),
+            ],
           ),
-          child: const Icon(Icons.shield, color: Colors.white),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Image.asset('assets/logo/logo.png', fit: BoxFit.cover),
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         ShaderMask(
           shaderCallback: (b) =>
               const LinearGradient(colors: [primary, neonBlue]).createShader(b),
@@ -380,6 +395,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             style: TextStyle(fontSize: 26, color: Colors.white),
           ),
         ),
+        const SizedBox(height: 4),
         const Text(
           "Create your account",
           style: TextStyle(fontSize: 12, color: muted),

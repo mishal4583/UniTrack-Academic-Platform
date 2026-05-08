@@ -2,8 +2,10 @@
 // faculty_manage_detail_screen.dart   Route: /faculty/manage/detail
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 import 'faculty_dashboard_layout.dart';
 
@@ -224,14 +226,50 @@ class _DetailService {
         .limit(1)
         .get();
     if (existing.docs.isNotEmpty) return;
-    await _db.collection('certificates').add({
+    final facultyDoc = await _db
+        .collection('users')
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .get();
+    final facultyName = (facultyDoc.data()?['name'] as String?) ?? 'Faculty';
+    final certRef = await _db.collection('certificates').add({
       'userId': userId,
       'itemId': itemId,
       'type': isActivity ? 'activity' : 'volunteering',
+
+      'title': itemDoc.data()?['title'] ?? '',
+      'facultyName': facultyName,
+      'rating': 0,
+      'feedback': '',
+
       'credits': credits,
-      'status': 'issued',
-      'createdAt': FieldValue.serverTimestamp(),
+
       'blockchainHash': null,
+      'transactionHash': null,
+
+      'issuedDate': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+
+      'status': 'issued',
+    });
+
+    await callBlockchain(
+      certificateId: certRef.id,
+      activityName: itemDoc.data()?['title'] ?? '',
+    );
+  }
+
+  static Future<void> callBlockchain({
+    required String certificateId,
+    required String activityName,
+  }) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: 'us-central1',
+    ).httpsCallable('issueCertificate');
+
+    await callable.call({
+      "certificateId": certificateId,
+      "activityName": activityName,
+      // studentAddress resolved server-side until wallet mapping is implemented
     });
   }
 }
@@ -342,7 +380,8 @@ class _FacultyManageDetailScreenState extends State<FacultyManageDetailScreen> {
 
   void _reload() {
     if (_id == null || !mounted) return;
-    setState(() => _future = _DetailService.load(_id!, _isActivity));
+    _future = _DetailService.load(_id!, _isActivity);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -952,7 +991,7 @@ class _ParticipantCardState extends State<_ParticipantCard> {
           );
           break;
       }
-      if (mounted) widget.onAction();
+      if (mounted) Future.microtask(widget.onAction);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1149,7 +1188,10 @@ class _ActionBtn extends StatelessWidget {
   final String label;
   final IconData icon;
   final List<Color> colors;
-  final VoidCallback onTap;
+  // Must be Future<void> Function() — NOT VoidCallback — because _act() is async.
+  // Passing an async function where VoidCallback is expected causes Flutter to
+  // detect the returned Future inside setState and throw the assertion error.
+  final Future<void> Function() onTap;
   const _ActionBtn({
     required this.label,
     required this.icon,
@@ -1159,7 +1201,9 @@ class _ActionBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
+    // GestureDetector.onTap is void Function() — bridge it here so the
+    // Future<void> from onTap() runs without leaking into Flutter's tap handler.
+    onTap: () => onTap(),
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
