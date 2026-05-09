@@ -11,9 +11,9 @@
 //                  certificatesCount = certificates.length
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 import 'student_dashboard_layout.dart';
 
@@ -760,10 +760,8 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
             if (d.certificatesCount > 3) ...[
               GestureDetector(
-                onTap: () => Navigator.pushReplacementNamed(
-                  context,
-                  '/student/certificates',
-                ),
+                onTap: () =>
+                    Navigator.pushNamed(context, '/student/certificates'),
                 child: Container(
                   width: double.infinity,
                   height: 44,

@@ -14,12 +14,12 @@
 //   Task 7 — Wrap used for meta chips; withOpacity → withValues.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
+
 import 'student_activities_screen.dart' show ActivityModel;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,16 +136,26 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     setState(() {});
 
     try {
-      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
-          .httpsCallable('enrollActivity');
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'us-central1',
+      ).httpsCallable('enrollActivity');
 
       await callable.call({'activityId': _activity!.id});
 
       if (!mounted) return;
-      _enrollmentStatus = 'Enrolled';
-      _enrolling = false;
-      setState(() {});
+
+      setState(() {
+        _enrollmentStatus = 'Enrolled';
+        _enrolling = false;
+      });
+
       _snack('Enrolled successfully! 🎉', _C.neonGreen);
+
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+
+        Navigator.pop(context);
+      });
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
       _enrolling = false;
@@ -245,10 +255,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             children: [
               // Back button
               GestureDetector(
-                onTap: () => Navigator.pushReplacementNamed(
-                  context,
-                  '/student/activities',
-                ),
+                onTap: () => Navigator.pop(context),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

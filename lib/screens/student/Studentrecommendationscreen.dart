@@ -9,9 +9,9 @@
 // Preferences (skills + interests) are persisted to users/{uid} in Firestore.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 import 'student_dashboard_layout.dart';
 
@@ -19,15 +19,15 @@ import 'student_dashboard_layout.dart';
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
 class _C {
-  static const card      = Color(0xFF111827);
-  static const primary   = Color(0xFF8B5CF6);
-  static const neonBlue  = Color(0xFF3B82F6);
-  static const neonCyan  = Color(0xFF06B6D4);
+  static const card = Color(0xFF111827);
+  static const primary = Color(0xFF8B5CF6);
+  static const neonBlue = Color(0xFF3B82F6);
+  static const neonCyan = Color(0xFF06B6D4);
   static const neonGreen = Color(0xFF10B981);
-  static const amber     = Color(0xFFF59E0B);
-  static const text      = Color(0xFFEFF3F8);
-  static const muted     = Color(0xFF7E8A9A);
-  static const border    = Color(0xFF1F2937);
+  static const amber = Color(0xFFF59E0B);
+  static const text = Color(0xFFEFF3F8);
+  static const muted = Color(0xFF7E8A9A);
+  static const border = Color(0xFF1F2937);
   static const secondary = Color(0xFF1A2235);
 }
 
@@ -35,28 +35,67 @@ class _C {
 // STATIC CATALOGUES  (skills & interests the student can pick from)
 // ─────────────────────────────────────────────────────────────────────────────
 const List<String> _kAllSkills = [
-  'Flutter', 'Python', 'Machine Learning', 'Data Science',
-  'Web Development', 'Java', 'C++', 'JavaScript', 'React',
-  'Node.js', 'Blockchain', 'UI/UX Design', 'Figma',
-  'Content Writing', 'Public Speaking', 'Research',
-  'Data Analysis', 'Cybersecurity', 'Cloud Computing',
-  'DevOps', 'Android Development', 'IoT', 'Embedded Systems',
-  'Database Management', 'Marketing', 'Finance',
-  'Business Strategy', 'Molecular Biology', 'Bioinformatics',
-  'Lab Research', 'Graphic Design', 'Video Editing',
+  'Flutter',
+  'Python',
+  'Machine Learning',
+  'Data Science',
+  'Web Development',
+  'Java',
+  'C++',
+  'JavaScript',
+  'React',
+  'Node.js',
+  'Blockchain',
+  'UI/UX Design',
+  'Figma',
+  'Content Writing',
+  'Public Speaking',
+  'Research',
+  'Data Analysis',
+  'Cybersecurity',
+  'Cloud Computing',
+  'DevOps',
+  'Android Development',
+  'IoT',
+  'Embedded Systems',
+  'Database Management',
+  'Marketing',
+  'Finance',
+  'Business Strategy',
+  'Molecular Biology',
+  'Bioinformatics',
+  'Lab Research',
+  'Graphic Design',
+  'Video Editing',
 ];
 
 const List<String> _kAllInterests = [
-  'Technology', 'Research & Innovation', 'Entrepreneurship',
-  'Community Service', 'Environmental Sustainability',
-  'Finance & Economics', 'Healthcare & Wellness',
-  'Creative Arts', 'Data & Analytics', 'Artificial Intelligence',
-  'Open Source', 'Social Impact', 'Education',
-  'Business & Strategy', 'Cybersecurity', 'Blockchain & Web3',
-  'Design & Creativity', 'Science & Engineering',
-  'Public Speaking & Debate', 'Mental Health & Wellbeing',
-  'Sports & Fitness', 'Cultural Activities', 'Networking',
-  'Leadership', 'Writing & Journalism', 'Film & Media',
+  'Technology',
+  'Research & Innovation',
+  'Entrepreneurship',
+  'Community Service',
+  'Environmental Sustainability',
+  'Finance & Economics',
+  'Healthcare & Wellness',
+  'Creative Arts',
+  'Data & Analytics',
+  'Artificial Intelligence',
+  'Open Source',
+  'Social Impact',
+  'Education',
+  'Business & Strategy',
+  'Cybersecurity',
+  'Blockchain & Web3',
+  'Design & Creativity',
+  'Science & Engineering',
+  'Public Speaking & Debate',
+  'Mental Health & Wellbeing',
+  'Sports & Fitness',
+  'Cultural Activities',
+  'Networking',
+  'Leadership',
+  'Writing & Journalism',
+  'Film & Media',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,8 +114,9 @@ int _computeScore({
   double skillScore = 0;
   if (requiredSkills.isNotEmpty && userSkills.isNotEmpty) {
     final lowerReq = requiredSkills.map((s) => s.toLowerCase()).toSet();
-    final matched =
-        userSkills.where((s) => lowerReq.contains(s.toLowerCase())).length;
+    final matched = userSkills
+        .where((s) => lowerReq.contains(s.toLowerCase()))
+        .length;
     skillScore = matched / requiredSkills.length;
   }
 
@@ -100,8 +140,7 @@ int _computeScore({
     deptScore = lowerDepts.contains(userDept.toLowerCase()) ? 1.0 : 0.0;
   }
 
-  final raw =
-      (0.45 * skillScore) + (0.35 * interestScore) + (0.20 * deptScore);
+  final raw = (0.45 * skillScore) + (0.35 * interestScore) + (0.20 * deptScore);
   return (raw * 100).round();
 }
 
@@ -200,16 +239,16 @@ class _RecService {
     final volSnap = results[2] as QuerySnapshot;
 
     final ud = _safe(userDoc);
-    final userDept      = (ud['department'] as String?) ?? '';
-    final userSkills    = _strList(ud['skills']);
+    final userDept = (ud['department'] as String?) ?? '';
+    final userSkills = _strList(ud['skills']);
     final userInterests = _strList(ud['interests']);
 
     final profile = _UserProfile(
-      name:        (ud['name']    as String?) ?? '',
-      department:  userDept,
-      credits:     (ud['credits'] as int?)    ?? 0,
-      skills:      userSkills,
-      interests:   userInterests,
+      name: (ud['name'] as String?) ?? '',
+      department: userDept,
+      credits: (ud['credits'] as int?) ?? 0,
+      skills: userSkills,
+      interests: userInterests,
     );
 
     final hasPrefs = userSkills.isNotEmpty || userInterests.isNotEmpty;
@@ -217,34 +256,34 @@ class _RecService {
     // ── Score activities ─────────────────────────────────────────────────────
     final scoredActs = actSnap.docs
         .map((doc) {
-          final d        = _safe(doc);
+          final d = _safe(doc);
           final enrolled = (d['enrolled'] as int?) ?? 0;
           final capacity = (d['capacity'] as int?) ?? 0;
           if (capacity > 0 && enrolled >= capacity) return null;
 
-          final reqSkills   = _strList(d['required_skills']);
-          final catTags     = _strList(d['category_tags']);
+          final reqSkills = _strList(d['required_skills']);
+          final catTags = _strList(d['category_tags']);
           final targetDepts = _strList(d['target_departments']);
 
           final score = _computeScore(
-            userDept:       userDept,
-            userSkills:     userSkills,
-            userInterests:  userInterests,
+            userDept: userDept,
+            userSkills: userSkills,
+            userInterests: userInterests,
             requiredSkills: reqSkills,
-            categoryTags:   catTags,
-            targetDepts:    targetDepts,
+            categoryTags: catTags,
+            targetDepts: targetDepts,
           );
 
           return _ScoredActivity(
-            id:             doc.id,
-            title:          (d['title']       as String?) ?? '',
-            description:    (d['description'] as String?) ?? '',
-            type:           (d['type']        as String?) ?? '',
-            department:     (d['department']  as String?) ?? '',
-            credits:        (d['credits']     as int?)    ?? 0,
-            enrolled:       enrolled,
-            capacity:       capacity,
-            score:          score,
+            id: doc.id,
+            title: (d['title'] as String?) ?? '',
+            description: (d['description'] as String?) ?? '',
+            type: (d['type'] as String?) ?? '',
+            department: (d['department'] as String?) ?? '',
+            credits: (d['credits'] as int?) ?? 0,
+            enrolled: enrolled,
+            capacity: capacity,
+            score: score,
             requiredSkills: reqSkills,
           );
         })
@@ -260,41 +299,41 @@ class _RecService {
     // ── Score volunteering ───────────────────────────────────────────────────
     final scoredVols = volSnap.docs
         .map((doc) {
-          final d       = _safe(doc);
+          final d = _safe(doc);
           final current = (d['currentParticipants'] as int?) ?? 0;
-          final max     = (d['maxParticipants']     as int?) ?? 0;
+          final max = (d['maxParticipants'] as int?) ?? 0;
           if (max > 0 && current >= max) return null;
 
-          final skills      = _strList(d['skills']);
-          final catTags     = _strList(d['category_tags']);
+          final skills = _strList(d['skills']);
+          final catTags = _strList(d['category_tags']);
           final targetDepts = _strList(d['target_departments']);
-          final category    = (d['category'] as String?) ?? '';
+          final category = (d['category'] as String?) ?? '';
 
           // Fall back to category string if no explicit category_tags
-          final List<String> effectiveTags =
-              catTags.isNotEmpty ? catTags
+          final List<String> effectiveTags = catTags.isNotEmpty
+              ? catTags
               : (category.isNotEmpty ? [category] : <String>[]);
 
           final score = _computeScore(
-            userDept:       userDept,
-            userSkills:     userSkills,
-            userInterests:  userInterests,
+            userDept: userDept,
+            userSkills: userSkills,
+            userInterests: userInterests,
             requiredSkills: skills,
-            categoryTags:   effectiveTags,
-            targetDepts:    targetDepts,
+            categoryTags: effectiveTags,
+            targetDepts: targetDepts,
           );
 
           return _ScoredVol(
-            id:           doc.id,
-            title:        (d['title']        as String?) ?? '',
-            description:  (d['description']  as String?) ?? '',
-            category:     category,
+            id: doc.id,
+            title: (d['title'] as String?) ?? '',
+            description: (d['description'] as String?) ?? '',
+            category: category,
             organization: (d['organization'] as String?) ?? '',
-            credits:      (d['credits']      as int?)    ?? 0,
-            current:      current,
-            max:          max,
-            score:        score,
-            skills:       skills,
+            credits: (d['credits'] as int?) ?? 0,
+            current: current,
+            max: max,
+            score: score,
+            skills: skills,
           );
         })
         .whereType<_ScoredVol>()
@@ -307,8 +346,8 @@ class _RecService {
     final topVols = filteredVols.take(5).toList();
 
     return _RecData(
-      profile:      profile,
-      activities:   topActs,
+      profile: profile,
+      activities: topActs,
       volunteering: topVols,
     );
   }
@@ -317,11 +356,10 @@ class _RecService {
     String uid,
     List<String> skills,
     List<String> interests,
-  ) =>
-      _db.collection('users').doc(uid).update({
-        'skills':    skills,
-        'interests': interests,
-      });
+  ) => _db.collection('users').doc(uid).update({
+    'skills': skills,
+    'interests': interests,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -334,17 +372,20 @@ class _GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width:   double.infinity,
-    margin:  const EdgeInsets.only(bottom: 12),
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color:        _C.card.withValues(alpha: 0.75),
+      color: _C.card.withValues(alpha: 0.75),
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: glowColor?.withValues(alpha: 0.4) ?? _C.border,
-      ),
+      border: Border.all(color: glowColor?.withValues(alpha: 0.4) ?? _C.border),
       boxShadow: glowColor != null
-          ? [BoxShadow(color: glowColor!.withValues(alpha: 0.15), blurRadius: 14)]
+          ? [
+              BoxShadow(
+                color: glowColor!.withValues(alpha: 0.15),
+                blurRadius: 14,
+              ),
+            ]
           : [],
     ),
     child: child,
@@ -369,9 +410,10 @@ class _SectionHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 36, height: 36,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color:        color.withValues(alpha: 0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, size: 18, color: color),
@@ -382,17 +424,22 @@ class _SectionHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title,
-                  style: const TextStyle(
-                      color: _C.text,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-              Text(subtitle,
-                  style: const TextStyle(color: _C.muted, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: _C.text,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(color: _C.muted, fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -417,8 +464,8 @@ class _ActionBtn extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      height:  38,
-      width:   double.infinity,
+      height: 38,
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         gradient: outlined
@@ -430,17 +477,19 @@ class _ActionBtn extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon,
-              color: outlined ? _C.primary : Colors.white, size: 15),
+          Icon(icon, color: outlined ? _C.primary : Colors.white, size: 15),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(label,
-                style: TextStyle(
-                    color: outlined ? _C.primary : Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: outlined ? _C.primary : Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
         ],
       ),
@@ -457,15 +506,16 @@ class _TagChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
     decoration: BoxDecoration(
-      color:        color.withValues(alpha: 0.1),
+      color: color.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(20),
-      border:       Border.all(color: color.withValues(alpha: 0.35)),
+      border: Border.all(color: color.withValues(alpha: 0.35)),
     ),
-    child: Text(label,
-        style: TextStyle(
-            color: color, fontSize: 10, fontWeight: FontWeight.w600),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis),
+    child: Text(
+      label,
+      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
   );
 }
 
@@ -487,17 +537,25 @@ class _MatchBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color:        c.withValues(alpha: 0.12),
+        color: c.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border:       Border.all(color: c.withValues(alpha: 0.4)),
+        border: Border.all(color: c.withValues(alpha: 0.4)),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.auto_awesome_rounded, size: 9, color: c),
-        const SizedBox(width: 3),
-        Text('$score% match',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.auto_awesome_rounded, size: 9, color: c),
+          const SizedBox(width: 3),
+          Text(
+            '$score% match',
             style: TextStyle(
-                color: c, fontSize: 9, fontWeight: FontWeight.w700)),
-      ]),
+              color: c,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -517,25 +575,28 @@ class _MatchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = (score / 100).clamp(0.0, 1.0);
-    final c   = _color;
+    final c = _color;
     return LayoutBuilder(
       builder: (_, constraints) => ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: SizedBox(
           height: 4,
-          width:  constraints.maxWidth,
-          child: Stack(children: [
-            Container(color: _C.secondary),
-            FractionallySizedBox(
-              widthFactor: pct,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      colors: [c, c.withValues(alpha: 0.6)]),
+          width: constraints.maxWidth,
+          child: Stack(
+            children: [
+              Container(color: _C.secondary),
+              FractionallySizedBox(
+                widthFactor: pct,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [c, c.withValues(alpha: 0.6)],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ),
       ),
     );
@@ -565,15 +626,18 @@ class _ToggleChip extends StatelessWidget {
         color: selected ? color.withValues(alpha: 0.18) : _C.secondary,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color:  selected ? color.withValues(alpha: 0.6) : _C.border,
-          width:  selected ? 1.2 : 1,
+          color: selected ? color.withValues(alpha: 0.6) : _C.border,
+          width: selected ? 1.2 : 1,
         ),
       ),
-      child: Text(label,
-          style: TextStyle(
-              color:      selected ? color : _C.muted,
-              fontSize:   11,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? color : _C.muted,
+          fontSize: 11,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
     ),
   );
 }
@@ -598,13 +662,13 @@ class _PreferencesPanelState extends State<_PreferencesPanel> {
   late Set<String> _skills;
   late Set<String> _interests;
   bool _expanded = false;
-  bool _saving   = false;
-  bool _dirty    = false;
+  bool _saving = false;
+  bool _dirty = false;
 
   @override
   void initState() {
     super.initState();
-    _skills    = Set.from(widget.initialSkills);
+    _skills = Set.from(widget.initialSkills);
     _interests = Set.from(widget.initialInterests);
   }
 
@@ -616,7 +680,11 @@ class _PreferencesPanelState extends State<_PreferencesPanel> {
   Future<void> _save() async {
     setState(() => _saving = true);
     await widget.onSave(_skills.toList(), _interests.toList());
-    if (mounted) setState(() { _saving = false; _dirty = false; });
+    if (mounted)
+      setState(() {
+        _saving = false;
+        _dirty = false;
+      });
   }
 
   @override
@@ -634,54 +702,66 @@ class _PreferencesPanelState extends State<_PreferencesPanel> {
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _expanded = !_expanded),
-            child: Row(children: [
-              Container(
-                width: 34, height: 34,
-                decoration: BoxDecoration(
-                  color:        _C.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.tune_rounded,
-                    color: _C.primary, size: 17),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('My Preferences',
-                        style: TextStyle(
-                            color:      _C.text,
-                            fontWeight: FontWeight.bold,
-                            fontSize:   14)),
-                    Text(
-                      sc > 0 || ic > 0
-                          ? '$sc skill${sc == 1 ? '' : 's'} · '
-                            '$ic interest${ic == 1 ? '' : 's'} selected'
-                          : 'Tap to add skills & interests',
-                      style: const TextStyle(color: _C.muted, fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              if (_dirty)
+            child: Row(
+              children: [
                 Container(
-                  width: 7, height: 7,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: const BoxDecoration(
-                      color: _C.amber, shape: BoxShape.circle),
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: _C.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.tune_rounded,
+                    color: _C.primary,
+                    size: 17,
+                  ),
                 ),
-              Icon(
-                _expanded
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-                color: _C.muted,
-                size:  20,
-              ),
-            ]),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'My Preferences',
+                        style: TextStyle(
+                          color: _C.text,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        sc > 0 || ic > 0
+                            ? '$sc skill${sc == 1 ? '' : 's'} · '
+                                  '$ic interest${ic == 1 ? '' : 's'} selected'
+                            : 'Tap to add skills & interests',
+                        style: const TextStyle(color: _C.muted, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_dirty)
+                  Container(
+                    width: 7,
+                    height: 7,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: const BoxDecoration(
+                      color: _C.amber,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                Icon(
+                  _expanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  color: _C.muted,
+                  size: 20,
+                ),
+              ],
+            ),
           ),
 
           // Expanded body
@@ -691,41 +771,53 @@ class _PreferencesPanelState extends State<_PreferencesPanel> {
             const SizedBox(height: 14),
 
             // Skills
-            const Text('Skills',
-                style: TextStyle(
-                    color:      _C.text,
-                    fontSize:   12,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Skills',
+              style: TextStyle(
+                color: _C.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 8),
             Wrap(
-              spacing: 6, runSpacing: 6,
+              spacing: 6,
+              runSpacing: 6,
               children: _kAllSkills
-                  .map((s) => _ToggleChip(
-                        label:    s,
-                        selected: _skills.contains(s),
-                        color:    _C.primary,
-                        onTap:    () => _toggle(_skills, s),
-                      ))
+                  .map(
+                    (s) => _ToggleChip(
+                      label: s,
+                      selected: _skills.contains(s),
+                      color: _C.primary,
+                      onTap: () => _toggle(_skills, s),
+                    ),
+                  )
                   .toList(),
             ),
             const SizedBox(height: 14),
 
             // Interests
-            const Text('Interests',
-                style: TextStyle(
-                    color:      _C.text,
-                    fontSize:   12,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'Interests',
+              style: TextStyle(
+                color: _C.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 8),
             Wrap(
-              spacing: 6, runSpacing: 6,
+              spacing: 6,
+              runSpacing: 6,
               children: _kAllInterests
-                  .map((i) => _ToggleChip(
-                        label:    i,
-                        selected: _interests.contains(i),
-                        color:    _C.neonCyan,
-                        onTap:    () => _toggle(_interests, i),
-                      ))
+                  .map(
+                    (i) => _ToggleChip(
+                      label: i,
+                      selected: _interests.contains(i),
+                      color: _C.neonCyan,
+                      onTap: () => _toggle(_interests, i),
+                    ),
+                  )
                   .toList(),
             ),
             const SizedBox(height: 14),
@@ -738,39 +830,43 @@ class _PreferencesPanelState extends State<_PreferencesPanel> {
                 height: 40,
                 decoration: BoxDecoration(
                   gradient: _dirty
-                      ? const LinearGradient(
-                          colors: [_C.primary, _C.neonBlue])
+                      ? const LinearGradient(colors: [_C.primary, _C.neonBlue])
                       : null,
-                  color:        _dirty ? null : _C.secondary,
+                  color: _dirty ? null : _C.secondary,
                   borderRadius: BorderRadius.circular(10),
                   border: _dirty ? null : Border.all(color: _C.border),
                 ),
                 child: Center(
                   child: _saving
                       ? const SizedBox(
-                          width: 16, height: 16,
+                          width: 16,
+                          height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(
-                            _dirty
-                                ? Icons.save_rounded
-                                : Icons.check_circle_rounded,
-                            color: _dirty ? Colors.white : _C.muted,
-                            size:  15,
+                            strokeWidth: 2,
+                            color: Colors.white,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _dirty
-                                ? 'Save & Re-score'
-                                : 'Preferences Saved',
-                            style: TextStyle(
-                              color:      _dirty ? Colors.white : _C.muted,
-                              fontSize:   13,
-                              fontWeight: FontWeight.w600,
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _dirty
+                                  ? Icons.save_rounded
+                                  : Icons.check_circle_rounded,
+                              color: _dirty ? Colors.white : _C.muted,
+                              size: 15,
                             ),
-                          ),
-                        ]),
+                            const SizedBox(width: 6),
+                            Text(
+                              _dirty ? 'Save & Re-score' : 'Preferences Saved',
+                              style: TextStyle(
+                                color: _dirty ? Colors.white : _C.muted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -797,42 +893,53 @@ class _ActivityCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         // Type pill + match badge + credits
-        Row(children: [
-          if (a.type.isNotEmpty)
-            Container(
-              margin:  const EdgeInsets.only(right: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color:        _C.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border:       Border.all(color: _C.primary.withValues(alpha: 0.3)),
+        Row(
+          children: [
+            if (a.type.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _C.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _C.primary.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  a.type,
+                  style: const TextStyle(
+                    color: _C.primary,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-              child: Text(a.type,
-                  style: const TextStyle(
-                      color:      _C.primary,
-                      fontSize:   9,
-                      fontWeight: FontWeight.w700)),
+            if (showScore && a.score > 0) _MatchBadge(score: a.score),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: _C.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _C.amber.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star_rounded, size: 10, color: _C.amber),
+                  const SizedBox(width: 3),
+                  Text(
+                    '+${a.credits}',
+                    style: const TextStyle(
+                      color: _C.amber,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          if (showScore && a.score > 0) _MatchBadge(score: a.score),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color:        _C.amber.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border:       Border.all(color: _C.amber.withValues(alpha: 0.3)),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.star_rounded, size: 10, color: _C.amber),
-              const SizedBox(width: 3),
-              Text('+${a.credits}',
-                  style: const TextStyle(
-                      color:      _C.amber,
-                      fontSize:   10,
-                      fontWeight: FontWeight.w700)),
-            ]),
-          ),
-        ]),
+          ],
+        ),
         const SizedBox(height: 8),
 
         // Match bar
@@ -841,35 +948,42 @@ class _ActivityCard extends StatelessWidget {
           const SizedBox(height: 8),
         ],
 
-        Text(a.title,
-            style: const TextStyle(
-                color:      _C.text,
-                fontWeight: FontWeight.w700,
-                fontSize:   14),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis),
+        Text(
+          a.title,
+          style: const TextStyle(
+            color: _C.text,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         const SizedBox(height: 4),
 
         if (a.department.isNotEmpty)
-          Text(a.department,
-              style: const TextStyle(color: _C.muted, fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            a.department,
+            style: const TextStyle(color: _C.muted, fontSize: 11),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
 
         if (a.description.isNotEmpty) ...[
           const SizedBox(height: 4),
-          Text(a.description,
-              style: const TextStyle(
-                  color: _C.muted, fontSize: 12, height: 1.45),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            a.description,
+            style: const TextStyle(color: _C.muted, fontSize: 12, height: 1.45),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
 
         // Required skills tags
         if (a.requiredSkills.isNotEmpty) ...[
           const SizedBox(height: 8),
           Wrap(
-            spacing: 4, runSpacing: 4,
+            spacing: 4,
+            runSpacing: 4,
             children: a.requiredSkills
                 .take(4)
                 .map((s) => _TagChip(label: s, color: _C.neonBlue))
@@ -879,36 +993,46 @@ class _ActivityCard extends StatelessWidget {
         const SizedBox(height: 10),
 
         // Enrollment fill bar
-        Row(children: [
-          const Icon(Icons.people_rounded, size: 11, color: _C.muted),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text('${a.enrolled}/${a.capacity} enrolled',
+        Row(
+          children: [
+            const Icon(Icons.people_rounded, size: 11, color: _C.muted),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                '${a.enrolled}/${a.capacity} enrolled',
                 style: const TextStyle(color: _C.muted, fontSize: 10),
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-          ),
-          Text('${(a.fillPct * 100).round()}%',
-              style: const TextStyle(color: _C.muted, fontSize: 10)),
-        ]),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              '${(a.fillPct * 100).round()}%',
+              style: const TextStyle(color: _C.muted, fontSize: 10),
+            ),
+          ],
+        ),
         const SizedBox(height: 5),
         LayoutBuilder(
           builder: (_, c) => ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: SizedBox(
-              height: 5, width: c.maxWidth,
-              child: Stack(children: [
-                Container(color: _C.secondary),
-                FractionallySizedBox(
-                  widthFactor: a.fillPct,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                          colors: [_C.primary, _C.neonBlue]),
+              height: 5,
+              width: c.maxWidth,
+              child: Stack(
+                children: [
+                  Container(color: _C.secondary),
+                  FractionallySizedBox(
+                    widthFactor: a.fillPct,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [_C.primary, _C.neonBlue],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ]),
+                ],
+              ),
             ),
           ),
         ),
@@ -916,9 +1040,8 @@ class _ActivityCard extends StatelessWidget {
 
         _ActionBtn(
           label: 'Enroll Now',
-          icon:  Icons.how_to_reg_rounded,
-          onTap: () =>
-              Navigator.pushNamed(context, '/student/activities'),
+          icon: Icons.how_to_reg_rounded,
+          onTap: () => Navigator.pushNamed(context, '/student/activities'),
         ),
       ],
     ),
@@ -941,46 +1064,62 @@ class _VolCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         // Category + match badge + credits
-        Row(children: [
-          if (v.category.isNotEmpty)
-            Flexible(
-              child: Container(
-                margin:  const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color:        _C.neonGreen.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border:       Border.all(color: _C.neonGreen.withValues(alpha: 0.3)),
-                ),
-                child: Text(v.category,
+        Row(
+          children: [
+            if (v.category.isNotEmpty)
+              Flexible(
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _C.neonGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _C.neonGreen.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    v.category,
                     style: const TextStyle(
-                        color:      _C.neonGreen,
-                        fontSize:   9,
-                        fontWeight: FontWeight.w700),
+                      color: _C.neonGreen,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            if (showScore && v.score > 0) _MatchBadge(score: v.score),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: _C.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _C.amber.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star_rounded, size: 10, color: _C.amber),
+                  const SizedBox(width: 3),
+                  Text(
+                    '+${v.credits}',
+                    style: const TextStyle(
+                      color: _C.amber,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
-          if (showScore && v.score > 0) _MatchBadge(score: v.score),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color:        _C.amber.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border:       Border.all(color: _C.amber.withValues(alpha: 0.3)),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.star_rounded, size: 10, color: _C.amber),
-              const SizedBox(width: 3),
-              Text('+${v.credits}',
-                  style: const TextStyle(
-                      color:      _C.amber,
-                      fontSize:   10,
-                      fontWeight: FontWeight.w700)),
-            ]),
-          ),
-        ]),
+          ],
+        ),
         const SizedBox(height: 8),
 
         // Match bar
@@ -989,35 +1128,42 @@ class _VolCard extends StatelessWidget {
           const SizedBox(height: 8),
         ],
 
-        Text(v.title,
-            style: const TextStyle(
-                color:      _C.text,
-                fontWeight: FontWeight.w700,
-                fontSize:   14),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis),
+        Text(
+          v.title,
+          style: const TextStyle(
+            color: _C.text,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         const SizedBox(height: 4),
 
         if (v.organization.isNotEmpty)
-          Text(v.organization,
-              style: const TextStyle(color: _C.muted, fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            v.organization,
+            style: const TextStyle(color: _C.muted, fontSize: 11),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
 
         if (v.description.isNotEmpty) ...[
           const SizedBox(height: 4),
-          Text(v.description,
-              style: const TextStyle(
-                  color: _C.muted, fontSize: 12, height: 1.45),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            v.description,
+            style: const TextStyle(color: _C.muted, fontSize: 12, height: 1.45),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
 
         // Skills tags
         if (v.skills.isNotEmpty) ...[
           const SizedBox(height: 8),
           Wrap(
-            spacing: 4, runSpacing: 4,
+            spacing: 4,
+            runSpacing: 4,
             children: v.skills
                 .take(4)
                 .map((s) => _TagChip(label: s, color: _C.neonCyan))
@@ -1027,47 +1173,56 @@ class _VolCard extends StatelessWidget {
         const SizedBox(height: 10),
 
         // Participants fill bar
-        Row(children: [
-          const Icon(Icons.people_rounded, size: 11, color: _C.muted),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text('${v.current}/${v.max} participants',
+        Row(
+          children: [
+            const Icon(Icons.people_rounded, size: 11, color: _C.muted),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                '${v.current}/${v.max} participants',
                 style: const TextStyle(color: _C.muted, fontSize: 10),
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-          ),
-          Text('${(v.fillPct * 100).round()}%',
-              style: const TextStyle(color: _C.muted, fontSize: 10)),
-        ]),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              '${(v.fillPct * 100).round()}%',
+              style: const TextStyle(color: _C.muted, fontSize: 10),
+            ),
+          ],
+        ),
         const SizedBox(height: 5),
         LayoutBuilder(
           builder: (_, c) => ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: SizedBox(
-              height: 5, width: c.maxWidth,
-              child: Stack(children: [
-                Container(color: _C.secondary),
-                FractionallySizedBox(
-                  widthFactor: v.fillPct,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                          colors: [_C.neonGreen, _C.neonCyan]),
+              height: 5,
+              width: c.maxWidth,
+              child: Stack(
+                children: [
+                  Container(color: _C.secondary),
+                  FractionallySizedBox(
+                    widthFactor: v.fillPct,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [_C.neonGreen, _C.neonCyan],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ]),
+                ],
+              ),
             ),
           ),
         ),
         const SizedBox(height: 12),
 
         _ActionBtn(
-          label:    'Apply Now',
-          icon:     Icons.eco_rounded,
+          label: 'Apply Now',
+          icon: Icons.eco_rounded,
           outlined: true,
-          onTap:    () =>
-              Navigator.pushNamed(context, '/student/volunteering'),
+          onTap: () => Navigator.pushNamed(context, '/student/volunteering'),
         ),
       ],
     ),
@@ -1086,14 +1241,21 @@ class StudentRecommendationScreen extends StatefulWidget {
 
 class _StudentRecommendationScreenState
     extends State<StudentRecommendationScreen> {
-  Future<_RecData> _future = Future.value(const _RecData(
-    profile: _UserProfile(
-        name: '', department: '', credits: 0, skills: [], interests: []),
-    activities:   [],
-    volunteering: [],
-  ));
+  Future<_RecData> _future = Future.value(
+    const _RecData(
+      profile: _UserProfile(
+        name: '',
+        department: '',
+        credits: 0,
+        skills: [],
+        interests: [],
+      ),
+      activities: [],
+      volunteering: [],
+    ),
+  );
   String _userName = '';
-  String _uid      = '';
+  String _uid = '';
 
   @override
   void initState() {
@@ -1107,7 +1269,9 @@ class _StudentRecommendationScreenState
     _uid = user.uid;
     final f = _RecService.load(_uid);
     _future = f;
-    f.then((d) { if (mounted) setState(() => _userName = d.profile.name); });
+    f.then((d) {
+      if (mounted) setState(() => _userName = d.profile.name);
+    });
     setState(() {});
   }
 
@@ -1119,7 +1283,7 @@ class _StudentRecommendationScreenState
   @override
   Widget build(BuildContext context) => StudentDashboardLayout(
     currentRoute: '/student/recommendations',
-    userName:     _userName,
+    userName: _userName,
     child: FutureBuilder<_RecData>(
       future: _future,
       builder: (context, snap) {
@@ -1127,8 +1291,7 @@ class _StudentRecommendationScreenState
         if (snap.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 80),
-            child: Center(
-                child: CircularProgressIndicator(color: _C.primary)),
+            child: Center(child: CircularProgressIndicator(color: _C.primary)),
           );
         }
 
@@ -1140,35 +1303,49 @@ class _StudentRecommendationScreenState
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.error_outline_rounded,
-                      color: Colors.redAccent, size: 36),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 36,
+                  ),
                   const SizedBox(height: 12),
-                  Text(snap.error.toString(),
-                      style: const TextStyle(
-                          color: _C.muted, fontSize: 12),
-                      textAlign: TextAlign.center),
+                  Text(
+                    snap.error.toString(),
+                    style: const TextStyle(color: _C.muted, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 16),
                   GestureDetector(
                     onTap: _init,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                            colors: [_C.primary, _C.neonBlue]),
+                          colors: [_C.primary, _C.neonBlue],
+                        ),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.refresh_rounded,
-                                color: Colors.white, size: 14),
-                            SizedBox(width: 6),
-                            Text('Retry',
-                                style: TextStyle(
-                                    color:      Colors.white,
-                                    fontWeight: FontWeight.bold)),
-                          ]),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Retry',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -1177,8 +1354,8 @@ class _StudentRecommendationScreenState
           );
         }
 
-        final data     = snap.data!;
-        final p        = data.profile;
+        final data = snap.data!;
+        final p = data.profile;
         final hasPrefs = p.hasPreferences;
 
         return Column(
@@ -1186,212 +1363,265 @@ class _StudentRecommendationScreenState
           mainAxisSize: MainAxisSize.min,
           children: [
             // ── A. Header ─────────────────────────────────────────────────────
-            Row(children: [
-              Container(
-                width: 42, height: 42,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
                       colors: [_C.primary, _C.neonCyan],
                       begin: Alignment.topLeft,
-                      end:   Alignment.bottomRight),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text('AI',
-                      style: TextStyle(
-                          color:      Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize:   14)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('AI Recommendations',
-                        style: TextStyle(
-                            color:      _C.text,
-                            fontWeight: FontWeight.bold,
-                            fontSize:   20),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    SizedBox(height: 2),
-                    Text('Content-based personalised matching',
-                        style:
-                            TextStyle(color: _C.muted, fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: _init,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color:        _C.secondary,
-                    borderRadius: BorderRadius.circular(10),
-                    border:       Border.all(color: _C.border),
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.refresh_rounded,
-                      color: _C.muted, size: 16),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 16),
-
-            // ── B. Profile card ───────────────────────────────────────────────
-            _GlassCard(
-              glowColor: _C.primary.withValues(alpha: 0.15),
-              child: Row(children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                        colors: [_C.primary, _C.neonBlue]),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
+                  child: const Center(
                     child: Text(
-                      p.name.isNotEmpty
-                          ? p.name[0].toUpperCase()
-                          : 'S',
-                      style: const TextStyle(
-                          color:      Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize:   16),
+                      'AI',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        p.name.isNotEmpty ? p.name : 'Student',
-                        style: const TextStyle(
-                            color:      _C.text,
-                            fontWeight: FontWeight.w600,
-                            fontSize:   14),
+                        'AI Recommendations',
+                        style: TextStyle(
+                          color: _C.text,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 6, runSpacing: 5, children: [
-                        if (p.department.isNotEmpty)
-                          _TagChip(
-                              label: '📚 ${p.department}',
-                              color: _C.primary),
-                        _TagChip(
-                            label: '⭐ ${p.credits} credits',
-                            color: _C.amber),
-                        if (p.skills.isNotEmpty)
-                          _TagChip(
-                              label: '🔧 ${p.skills.length} skills',
-                              color: _C.neonBlue),
-                        if (p.interests.isNotEmpty)
-                          _TagChip(
-                              label:
-                                  '💡 ${p.interests.length} interests',
-                              color: _C.neonCyan),
-                      ]),
+                      SizedBox(height: 2),
+                      Text(
+                        'Content-based personalised matching',
+                        style: TextStyle(color: _C.muted, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
-              ]),
-            ),
-
-            // ── C. Preferences panel ──────────────────────────────────────────
-            _PreferencesPanel(
-              initialSkills:    p.skills,
-              initialInterests: p.interests,
-              onSave:           _savePrefs,
-            ),
-
-            // ── D. Algorithm info (only when prefs are set) ───────────────────
-            if (hasPrefs)
-              _GlassCard(
-                child: Row(children: [
-                  Container(
-                    width: 34, height: 34,
+                GestureDetector(
+                  onTap: _init,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color:        _C.neonCyan.withValues(alpha: 0.1),
+                      color: _C.secondary,
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _C.border),
                     ),
-                    child: const Icon(Icons.calculate_rounded,
-                        color: _C.neonCyan, size: 17),
+                    child: const Icon(
+                      Icons.refresh_rounded,
+                      color: _C.muted,
+                      size: 16,
+                    ),
                   ),
-                  const SizedBox(width: 10),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // ── B. Profile card ───────────────────────────────────────────────
+            _GlassCard(
+              glowColor: _C.primary.withValues(alpha: 0.15),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [_C.primary, _C.neonBlue],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        p.name.isNotEmpty ? p.name[0].toUpperCase() : 'S',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Scoring Formula',
-                            style: TextStyle(
-                                color:      _C.text,
-                                fontSize:   13,
-                                fontWeight: FontWeight.bold)),
+                        Text(
+                          p.name.isNotEmpty ? p.name : 'Student',
+                          style: const TextStyle(
+                            color: _C.text,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 6),
-                        Wrap(spacing: 6, runSpacing: 4, children: const [
-                          _TagChip(label: '45% Skills',     color: _C.primary),
-                          _TagChip(label: '35% Interests',  color: _C.neonCyan),
-                          _TagChip(label: '20% Department', color: _C.neonGreen),
-                        ]),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 5,
+                          children: [
+                            if (p.department.isNotEmpty)
+                              _TagChip(
+                                label: '📚 ${p.department}',
+                                color: _C.primary,
+                              ),
+                            _TagChip(
+                              label: '⭐ ${p.credits} credits',
+                              color: _C.amber,
+                            ),
+                            if (p.skills.isNotEmpty)
+                              _TagChip(
+                                label: '🔧 ${p.skills.length} skills',
+                                color: _C.neonBlue,
+                              ),
+                            if (p.interests.isNotEmpty)
+                              _TagChip(
+                                label: '💡 ${p.interests.length} interests',
+                                color: _C.neonCyan,
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                ]),
+                ],
+              ),
+            ),
+
+            // ── C. Preferences panel ──────────────────────────────────────────
+            _PreferencesPanel(
+              initialSkills: p.skills,
+              initialInterests: p.interests,
+              onSave: _savePrefs,
+            ),
+
+            // ── D. Algorithm info (only when prefs are set) ───────────────────
+            if (hasPrefs)
+              _GlassCard(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: _C.neonCyan.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.calculate_rounded,
+                        color: _C.neonCyan,
+                        size: 17,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Scoring Formula',
+                            style: TextStyle(
+                              color: _C.text,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: const [
+                              _TagChip(label: '45% Skills', color: _C.primary),
+                              _TagChip(
+                                label: '35% Interests',
+                                color: _C.neonCyan,
+                              ),
+                              _TagChip(
+                                label: '20% Department',
+                                color: _C.neonGreen,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
             // ── E. Prompt to set prefs (shown when no prefs yet) ──────────────
             if (!hasPrefs)
               _GlassCard(
                 glowColor: _C.amber.withValues(alpha: 0.2),
-                child: Row(children: [
-                  Container(
-                    width: 34, height: 34,
-                    decoration: BoxDecoration(
-                      color:        _C.amber.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: _C.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.lightbulb_rounded,
+                        color: _C.amber,
+                        size: 17,
+                      ),
                     ),
-                    child: const Icon(Icons.lightbulb_rounded,
-                        color: _C.amber, size: 17),
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Boost Your Recommendations',
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Boost Your Recommendations',
                             style: TextStyle(
-                                color:      _C.text,
-                                fontSize:   13,
-                                fontWeight: FontWeight.bold)),
-                        SizedBox(height: 3),
-                        Text(
-                          'Add skills & interests above to unlock '
-                          'personalised match scores (0–100%)',
-                          style: TextStyle(color: _C.muted, fontSize: 11),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                              color: _C.text,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Add skills & interests above to unlock '
+                            'personalised match scores (0–100%)',
+                            style: TextStyle(color: _C.muted, fontSize: 11),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ),
 
             // ── F. Recommended activities ─────────────────────────────────────
             _SectionHeader(
-              icon:     Icons.auto_awesome_rounded,
-              color:    _C.primary,
-              title:    'Recommended Activities',
+              icon: Icons.auto_awesome_rounded,
+              color: _C.primary,
+              title: 'Recommended Activities',
               subtitle: hasPrefs
                   ? 'Scored by skills, interests & department'
                   : 'Matched to your department',
@@ -1401,35 +1631,34 @@ class _StudentRecommendationScreenState
                 ? _GlassCard(
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Row(children: [
-                        Icon(Icons.inbox_rounded,
-                            color: _C.muted, size: 20),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'No matching activities right now.',
-                            style: TextStyle(
-                                color: _C.muted, fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          Icon(Icons.inbox_rounded, color: _C.muted, size: 20),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'No matching activities right now.',
+                              style: TextStyle(color: _C.muted, fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                     ),
                   )
                 : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: data.activities
-                        .map((a) => _ActivityCard(
-                            a: a, showScore: hasPrefs))
+                        .map((a) => _ActivityCard(a: a, showScore: hasPrefs))
                         .toList(),
                   ),
 
             // ── G. Recommended volunteering ───────────────────────────────────
             _SectionHeader(
-              icon:     Icons.eco_rounded,
-              color:    _C.neonGreen,
-              title:    'Recommended Volunteering',
+              icon: Icons.eco_rounded,
+              color: _C.neonGreen,
+              title: 'Recommended Volunteering',
               subtitle: hasPrefs
                   ? 'Scored by skills, interests & category'
                   : 'Open opportunities for you',
@@ -1439,27 +1668,26 @@ class _StudentRecommendationScreenState
                 ? _GlassCard(
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Row(children: [
-                        Icon(Icons.inbox_rounded,
-                            color: _C.muted, size: 20),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'No matching volunteering right now.',
-                            style: TextStyle(
-                                color: _C.muted, fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          Icon(Icons.inbox_rounded, color: _C.muted, size: 20),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'No matching volunteering right now.',
+                              style: TextStyle(color: _C.muted, fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                     ),
                   )
                 : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: data.volunteering
-                        .map((v) =>
-                            _VolCard(v: v, showScore: hasPrefs))
+                        .map((v) => _VolCard(v: v, showScore: hasPrefs))
                         .toList(),
                   ),
 
@@ -1467,58 +1695,73 @@ class _StudentRecommendationScreenState
             const SizedBox(height: 4),
             _GlassCard(
               glowColor: _C.neonCyan.withValues(alpha: 0.2),
-              child: Row(children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color:        _C.neonCyan.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.explore_rounded,
-                      color: _C.neonCyan, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Explore All',
-                          style: TextStyle(
-                              color:      _C.text,
-                              fontWeight: FontWeight.w700,
-                              fontSize:   13),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      Text(
-                        'Browse the full catalogue of activities & volunteering',
-                        style: TextStyle(color: _C.muted, fontSize: 10),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => Navigator.pushReplacementNamed(
-                      context, '/student/activities'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                          colors: [_C.neonCyan, _C.neonBlue]),
-                      borderRadius: BorderRadius.circular(8),
+                      color: _C.neonCyan.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Text('Browse',
-                        style: TextStyle(
-                            color:      Colors.white,
-                            fontSize:   11,
-                            fontWeight: FontWeight.bold)),
+                    child: const Icon(
+                      Icons.explore_rounded,
+                      color: _C.neonCyan,
+                      size: 20,
+                    ),
                   ),
-                ),
-              ]),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Explore All',
+                          style: TextStyle(
+                            color: _C.text,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Browse the full catalogue of activities & volunteering',
+                          style: TextStyle(color: _C.muted, fontSize: 10),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/student/activities'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_C.neonCyan, _C.neonBlue],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Browse',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         );

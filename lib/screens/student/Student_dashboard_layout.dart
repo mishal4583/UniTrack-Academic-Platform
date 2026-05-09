@@ -16,12 +16,11 @@
 //   • The layout owns the Scaffold + SingleChildScrollView
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:unitrack_flutter/screens/auth/auth_gate.dart';
+import 'package:flutter/material.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DESIGN TOKENS
+// DESIGN TOKENS  (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class _C {
   static const bg = Color(0xFF080D19);
@@ -37,7 +36,7 @@ class _C {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NAV ITEM DATA
+// NAV ITEM DATA  (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class _NavItem {
   final String label;
@@ -113,7 +112,7 @@ const _bottomNavItems = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRID BACKGROUND
+// GRID BACKGROUND  (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GridPainter extends CustomPainter {
   @override
@@ -134,7 +133,7 @@ class _GridPainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PULSING DOT
+// PULSING DOT  (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class _PulsingDot extends StatefulWidget {
   const _PulsingDot();
@@ -146,6 +145,7 @@ class _PulsingDotState extends State<_PulsingDot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _anim;
+
   @override
   void initState() {
     super.initState();
@@ -177,48 +177,39 @@ class _PulsingDotState extends State<_PulsingDot>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SIDEBAR CONTENT (shared between desktop pinned sidebar & mobile drawer)
+// SIDEBAR CONTENT
+//
+// FIX A — _navigate: close drawer AFTER scheduling navigation via addPostFrameCallback.
+//         This prevents setState-during-dispose when the route change tears down
+//         the parent widget while drawer-close setState is still pending.
+//
+// FIX B — _logout: do NOT call onItemTap before signOut.
+//         Capture navigator + mounted check BEFORE the async gap.
+//         After signOut, use the captured navigator reference so we never
+//         touch a potentially-disposed BuildContext.
 // ─────────────────────────────────────────────────────────────────────────────
 class _SidebarContent extends StatelessWidget {
   final String currentRoute;
   final bool expanded;
   final String userName;
-  final VoidCallback? onItemTap; // used in mobile drawer to close it
+  // FIX A: callback now receives the destination route so the parent can
+  // close the drawer AND navigate in the correct order.
+  final void Function(String route)? onNavigate;
+  // FIX B: separate logout callback — parent handles drawer close + signout
+  final VoidCallback? onLogout;
 
   const _SidebarContent({
     required this.currentRoute,
     required this.expanded,
     required this.userName,
-    this.onItemTap,
+    this.onNavigate,
+    this.onLogout,
   });
-
-  void _navigate(BuildContext context, String route) {
-    if (currentRoute == route) return;
-    onItemTap?.call();
-    Navigator.pushReplacementNamed(context, route);
-  }
-
-  Future<void> _logout(BuildContext context) async {
-    onItemTap?.call();
-
-    try {
-      await FirebaseAuth.instance.signOut();
-
-      if (!context.mounted) return;
-
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AuthGate()),
-        (route) => false,
-      );
-    } catch (e) {
-      debugPrint('Logout error: $e');
-    }
-  }
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      // ── Logo / brand ─────────────────────────────────────────────────────
+      // ── Logo / brand ──────────────────────────────────────────────────────
       Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
@@ -272,14 +263,18 @@ class _SidebarContent extends StatelessWidget {
         ),
       ),
 
-      // ── Nav items ────────────────────────────────────────────────────────
+      // ── Nav items ─────────────────────────────────────────────────────────
       Expanded(
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           children: _sidebarItems.map((item) {
             final isActive = currentRoute == item.route;
             return GestureDetector(
-              onTap: () => _navigate(context, item.route),
+              // FIX A: delegate navigation to parent via onNavigate callback
+              onTap: () {
+                if (currentRoute == item.route) return;
+                onNavigate?.call(item.route);
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(bottom: 3),
@@ -340,7 +335,7 @@ class _SidebarContent extends StatelessWidget {
         ),
       ),
 
-      // ── User + Logout ─────────────────────────────────────────────────────
+      // ── User + Logout ──────────────────────────────────────────────────────
       Container(
         padding: const EdgeInsets.all(8),
         decoration: const BoxDecoration(
@@ -390,8 +385,9 @@ class _SidebarContent extends StatelessWidget {
                   ],
                 ),
               ),
+            // FIX B: logout calls parent callback — parent owns signOut logic
             GestureDetector(
-              onTap: () => _logout(context),
+              onTap: onLogout,
               child: Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: expanded ? 12 : 8,
@@ -427,7 +423,7 @@ class _SidebarContent extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TOP HEADER
+// TOP HEADER  (unchanged visually)
 // ─────────────────────────────────────────────────────────────────────────────
 class _Header extends StatelessWidget {
   final String pageTitle;
@@ -456,7 +452,6 @@ class _Header extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Menu / toggle button
           GestureDetector(
             onTap: onMenuTap,
             child: Container(
@@ -479,8 +474,6 @@ class _Header extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-
-          // Page title
           Expanded(
             child: Text(
               pageTitle,
@@ -493,8 +486,6 @@ class _Header extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-
-          // Network badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -519,8 +510,6 @@ class _Header extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-
-          // Avatar
           Container(
             width: 32,
             height: 32,
@@ -546,7 +535,7 @@ class _Header extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BOTTOM NAV (mobile only)
+// BOTTOM NAV  (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class _BottomNav extends StatelessWidget {
   final String currentRoute;
@@ -601,6 +590,23 @@ class _BottomNav extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC LAYOUT WIDGET
+//
+// All mobile navigation fixes live here. The layout is the single owner of:
+//   • drawer open/close state
+//   • navigation execution
+//   • logout execution
+//
+// FIX A — _handleNavigate: close drawer first, then navigate on the next frame.
+//         Prevents "setState called after dispose" when pushReplacementNamed
+//         tears down this widget while the drawer-close setState is still queued.
+//
+// FIX B — _handleLogout: never call setState after an async gap without a
+//         mounted check on THIS widget. signOut is awaited, then we use
+//         Navigator.of(context, rootNavigator: true) to escape any nested
+//         navigator context and reach the MaterialApp-level router.
+//
+// FIX C — drawer overlay: wrap setState in a mounted guard via a local
+//         captured reference so tap-to-close never fires on a dead state.
 // ─────────────────────────────────────────────────────────────────────────────
 class StudentDashboardLayout extends StatefulWidget {
   final String currentRoute;
@@ -621,6 +627,8 @@ class StudentDashboardLayout extends StatefulWidget {
 class _StudentDashboardLayoutState extends State<StudentDashboardLayout> {
   bool _sidebarExpanded = true;
   bool _mobileDrawerOpen = false;
+  // FIX B: track logout in-progress to prevent double-tap / re-entrant calls
+  bool _loggingOut = false;
 
   String get _pageTitle {
     switch (widget.currentRoute) {
@@ -641,6 +649,46 @@ class _StudentDashboardLayoutState extends State<StudentDashboardLayout> {
     }
   }
 
+  // FIX A: close drawer first, navigate on next frame
+  void _handleNavigate(String route) {
+    if (!mounted) return;
+    if (_mobileDrawerOpen) {
+      setState(() => _mobileDrawerOpen = false);
+      // Navigate after the drawer-close rebuild completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, route);
+      });
+    } else {
+      Navigator.pushReplacementNamed(context, route);
+    }
+  }
+
+  // FIX B: close drawer first, then sign out, then navigate using root navigator
+  Future<void> _handleLogout() async {
+    if (_loggingOut || !mounted) return;
+    _loggingOut = true;
+
+    // Close drawer synchronously before any async work
+    if (_mobileDrawerOpen && mounted) {
+      setState(() => _mobileDrawerOpen = false);
+    }
+
+    // Capture navigator before the async gap
+    final nav = Navigator.of(context, rootNavigator: true);
+
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      debugPrint('Logout error: $e');
+      if (mounted) _loggingOut = false;
+      return;
+    }
+
+    // Use the captured navigator — never touch context after async gap without check
+    nav.pushNamedAndRemoveUntil('/', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
@@ -659,7 +707,7 @@ class _StudentDashboardLayoutState extends State<StudentDashboardLayout> {
           // Main layout
           Row(
             children: [
-              // ── Desktop pinned sidebar ───────────────────────────────────────
+              // ── Desktop pinned sidebar ─────────────────────────────────────
               if (!isMobile)
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
@@ -673,10 +721,12 @@ class _StudentDashboardLayoutState extends State<StudentDashboardLayout> {
                     currentRoute: widget.currentRoute,
                     expanded: _sidebarExpanded,
                     userName: widget.userName,
+                    onNavigate: _handleNavigate,
+                    onLogout: _handleLogout,
                   ),
                 ),
 
-              // ── Content column ───────────────────────────────────────────────
+              // ── Content column ─────────────────────────────────────────────
               Expanded(
                 child: Column(
                   children: [
@@ -686,10 +736,16 @@ class _StudentDashboardLayoutState extends State<StudentDashboardLayout> {
                       isMobile: isMobile,
                       sidebarExpanded: _sidebarExpanded,
                       onMenuTap: isMobile
-                          ? () => setState(() => _mobileDrawerOpen = true)
-                          : () => setState(
-                              () => _sidebarExpanded = !_sidebarExpanded,
-                            ),
+                          ? () {
+                              if (mounted)
+                                setState(() => _mobileDrawerOpen = true);
+                            }
+                          : () {
+                              if (mounted)
+                                setState(
+                                  () => _sidebarExpanded = !_sidebarExpanded,
+                                );
+                            },
                     ),
                     Expanded(
                       child: SingleChildScrollView(
@@ -708,16 +764,18 @@ class _StudentDashboardLayoutState extends State<StudentDashboardLayout> {
             ],
           ),
 
-          // ── Mobile drawer overlay ────────────────────────────────────────
-          if (_mobileDrawerOpen)
+          // ── Mobile drawer overlay ──────────────────────────────────────────
+          // FIX C: use local 'this' capture — setState only if still mounted
+          if (_mobileDrawerOpen) ...[
             Positioned.fill(
               child: GestureDetector(
-                onTap: () => setState(() => _mobileDrawerOpen = false),
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (mounted) setState(() => _mobileDrawerOpen = false);
+                },
                 child: Container(color: Colors.black.withValues(alpha: 0.5)),
               ),
             ),
-
-          if (_mobileDrawerOpen)
             Positioned(
               left: 0,
               top: 0,
@@ -732,10 +790,12 @@ class _StudentDashboardLayoutState extends State<StudentDashboardLayout> {
                   currentRoute: widget.currentRoute,
                   expanded: true,
                   userName: widget.userName,
-                  onItemTap: () => setState(() => _mobileDrawerOpen = false),
+                  onNavigate: _handleNavigate,
+                  onLogout: _handleLogout,
                 ),
               ),
             ),
+          ],
         ],
       ),
     );

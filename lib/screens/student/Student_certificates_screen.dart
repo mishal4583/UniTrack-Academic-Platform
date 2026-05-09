@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// student certificates_screen.dart   Route: /student/certificates
+// student_certificates_screen.dart   Route: /student/certificates
 //
 // DATA FLOW:
 //   1. Query certificates where userId == currentUser.uid
@@ -7,11 +7,16 @@
 //   3. Batch-fetch activities + volunteering using whereIn (max 30 per call)
 //   4. Map itemId → title for each certificate
 //   (No N+1 queries — all secondary fetches are batched in parallel)
+//
+// LAYOUT:
+//   Uses StudentDashboardLayout as root widget.
+//   No standalone Scaffold, no custom header, no back button.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS  (matches existing student dark theme)
@@ -132,9 +137,11 @@ class _CertService {
 
       final itemId = (d['itemId'] as String?) ?? '';
       final type = (d['type'] as String?) ?? 'activity';
-      final item = (type == 'volunteering' ? volMap[itemId] : actMap[itemId]) ?? {};
+      final item =
+          (type == 'volunteering' ? volMap[itemId] : actMap[itemId]) ?? {};
 
-      final title = (item['title'] as String?) ??
+      final title =
+          (item['title'] as String?) ??
           (type == 'volunteering' ? 'Volunteering' : 'Activity');
 
       final ts = d['createdAt'];
@@ -168,31 +175,11 @@ class _CertService {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRID BACKGROUND
-// ─────────────────────────────────────────────────────────────────────────────
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF1F2937).withValues(alpha: 0.25)
-      ..strokeWidth = 0.8;
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    }
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter _) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 class StudentCertificatesScreen extends StatefulWidget {
   const StudentCertificatesScreen({super.key});
+
   @override
   State<StudentCertificatesScreen> createState() =>
       _StudentCertificatesScreenState();
@@ -202,10 +189,13 @@ class _StudentCertificatesScreenState extends State<StudentCertificatesScreen> {
   Future<List<Certificate>> _future = Future.value([]);
   String _filter = 'All'; // All / Activity / Volunteering
   String _status = 'All'; // All / issued / verified
+  String _userName = '';
 
   @override
   void initState() {
     super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    _userName = user?.displayName ?? user?.email ?? 'Student';
     Future.microtask(_load);
   }
 
@@ -213,8 +203,9 @@ class _StudentCertificatesScreenState extends State<StudentCertificatesScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || !mounted) return;
     final f = _CertService.loadForUser(uid);
-    _future = f;
-    setState(() {});
+    setState(() {
+      _future = f;
+    });
   }
 
   List<Certificate> _applyFilters(List<Certificate> all) => all.where((c) {
@@ -225,215 +216,177 @@ class _StudentCertificatesScreenState extends State<StudentCertificatesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    final botPad = MediaQuery.of(context).padding.bottom;
-
-    return Scaffold(
-      backgroundColor: _C.bg,
-      body: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-          Column(
-            children: [
-              // ── Header ──────────────────────────────────────────────────────────
-              Container(
-                padding: EdgeInsets.fromLTRB(16, topPad + 12, 16, 12),
-                decoration: BoxDecoration(
-                  color: _C.card.withValues(alpha: 0.7),
-                  border: const Border(bottom: BorderSide(color: _C.border)),
-                ),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () =>
-                          Navigator.pushReplacementNamed(context, '/student'),
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: _C.secondary,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _C.border),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: _C.muted,
-                          size: 15,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Certificate Wallet',
-                            style: TextStyle(
-                              color: _C.text,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'Your blockchain-verified credentials',
-                            style: TextStyle(color: _C.muted, fontSize: 11),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: _load,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: _C.secondary,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _C.border),
-                        ),
-                        child: const Icon(
-                          Icons.refresh_rounded,
-                          color: _C.muted,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+    return StudentDashboardLayout(
+      currentRoute: '/student/certificates',
+      userName: _userName,
+      child: FutureBuilder<List<Certificate>>(
+        future: _future,
+        builder: (context, snap) {
+          // ── Loading ─────────────────────────────────────────────────────────
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const SizedBox(
+              height: 320,
+              child: Center(
+                child: CircularProgressIndicator(color: _C.primary),
               ),
+            );
+          }
 
-              // ── Body ────────────────────────────────────────────────────────────
-              Expanded(
-                child: FutureBuilder<List<Certificate>>(
-                  future: _future,
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: _C.primary),
-                      );
-                    }
-
-                    if (snap.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
+          // ── Error ───────────────────────────────────────────────────────────
+          if (snap.hasError) {
+            return SizedBox(
+              height: 320,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        color: Colors.redAccent,
+                        size: 40,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Failed to load certificates',
+                        style: TextStyle(
+                          color: _C.text,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        snap.error.toString(),
+                        style: const TextStyle(color: _C.muted, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      GestureDetector(
+                        onTap: _load,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_C.primary, _C.neonBlue],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.error_outline_rounded,
-                                color: Colors.redAccent,
-                                size: 40,
+                              Icon(
+                                Icons.refresh_rounded,
+                                color: Colors.white,
+                                size: 16,
                               ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Failed to load certificates',
-                                style: TextStyle(
-                                  color: _C.text,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
+                              SizedBox(width: 8),
                               Text(
-                                snap.error.toString(),
-                                style: const TextStyle(
-                                  color: _C.muted,
-                                  fontSize: 12,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 20),
-                              GestureDetector(
-                                onTap: _load,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [_C.primary, _C.neonBlue],
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.refresh_rounded,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Retry',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                'Retry',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      );
-                    }
-
-                    final all = snap.data ?? [];
-                    final filtered = _applyFilters(all);
-
-                    // Summary totals (from all certs, not filtered)
-                    final totalCredits = all.fold(0, (s, c) => s + c.credits);
-                    final verifiedCount = all.where((c) => c.isVerified).length;
-
-                    return SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(16, 16, 16, botPad + 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // ── Summary strip ──────────────────────────────────────
-                          _SummaryStrip(
-                            total: all.length,
-                            credits: totalCredits,
-                            verified: verifiedCount,
-                          ),
-                          const SizedBox(height: 16),
-
-                          // ── Filters ────────────────────────────────────────────
-                          _FilterRow(
-                            typeFilter: _filter,
-                            statusFilter: _status,
-                            onTypeChanged: (v) => setState(() => _filter = v),
-                            onStatusChanged: (v) => setState(() => _status = v),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // ── List / empty ───────────────────────────────────────
-                          if (all.isEmpty)
-                            _EmptyState()
-                          else if (filtered.isEmpty)
-                            _NoMatch()
-                          else
-                            ...filtered.map((c) => CertificateCard(cert: c)),
-                        ],
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
               ),
+            );
+          }
+
+          // ── Data ────────────────────────────────────────────────────────────
+          final all = snap.data ?? [];
+          final filtered = _applyFilters(all);
+
+          // Summary totals (from all certs, not filtered)
+          final totalCredits = all.fold(0, (s, c) => s + c.credits);
+          final verifiedCount = all.where((c) => c.isVerified).length;
+
+          // ── Page subtitle strip ─────────────────────────────────────────────
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Page intro + refresh button ─────────────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Certificate Wallet',
+                          style: TextStyle(
+                            color: _C.text,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Your blockchain-verified credentials',
+                          style: const TextStyle(color: _C.muted, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _load,
+                    child: Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: _C.secondary,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _C.border),
+                      ),
+                      child: const Icon(
+                        Icons.refresh_rounded,
+                        color: _C.muted,
+                        size: 17,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // ── Summary strip ───────────────────────────────────────────────
+              _SummaryStrip(
+                total: all.length,
+                credits: totalCredits,
+                verified: verifiedCount,
+              ),
+              const SizedBox(height: 16),
+
+              // ── Filters ─────────────────────────────────────────────────────
+              _FilterRow(
+                typeFilter: _filter,
+                statusFilter: _status,
+                onTypeChanged: (v) => setState(() => _filter = v),
+                onStatusChanged: (v) => setState(() => _status = v),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Certificate list / empty states ─────────────────────────────
+              if (all.isEmpty)
+                _EmptyState()
+              else if (filtered.isEmpty)
+                _NoMatch()
+              else
+                ...filtered.map((c) => CertificateCard(cert: c)),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -628,6 +581,11 @@ class CertificateCard extends StatelessWidget {
     return '${dt.day.toString().padLeft(2, '0')}/'
         '${dt.month.toString().padLeft(2, '0')}/'
         '${dt.year}';
+  }
+
+  static String _truncateHash(String hash) {
+    if (hash.length <= 14) return hash;
+    return '${hash.substring(0, 8)}...${hash.substring(hash.length - 6)}';
   }
 
   @override
@@ -888,11 +846,6 @@ class CertificateCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static String _truncateHash(String hash) {
-    if (hash.length <= 14) return hash;
-    return '${hash.substring(0, 8)}...${hash.substring(hash.length - 6)}';
   }
 }
 

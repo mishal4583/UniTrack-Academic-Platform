@@ -2,10 +2,9 @@
 // student_my_progress_screen.dart   Route: /student/my-progress
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,10 +229,7 @@ class _StudentMyProgressScreenState extends State<StudentMyProgressScreen> {
             Row(
               children: [
                 GestureDetector(
-                  onTap: () => Navigator.pushReplacementNamed(
-                    context,
-                    '/student/volunteering',
-                  ),
+                  onTap: () => Navigator.pop(context),
                   child: Container(
                     width: 34,
                     height: 34,

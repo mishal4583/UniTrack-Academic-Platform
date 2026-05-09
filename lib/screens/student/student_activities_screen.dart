@@ -10,10 +10,9 @@
 //   • No mock data
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -779,10 +778,8 @@ class _StudentActivitiesScreenState extends State<StudentActivitiesScreen> {
                   ),
                   const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: () => Navigator.pushReplacementNamed(
-                      context,
-                      '/student/volunteering',
-                    ),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/student/volunteering'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,

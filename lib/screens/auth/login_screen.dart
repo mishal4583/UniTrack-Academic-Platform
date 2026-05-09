@@ -1,8 +1,9 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -55,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final role = userDoc['role'];
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, "/$role");
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

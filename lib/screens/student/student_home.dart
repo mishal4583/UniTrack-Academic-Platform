@@ -2,10 +2,9 @@
 // student_home.dart   Route: /student
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:unitrack_flutter/screens/student/student_dashboard_layout.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -272,10 +271,7 @@ class _GlassCard extends StatelessWidget {
   final Widget child;
   final Color? glowColor;
 
-  const _GlassCard({
-    required this.child,
-    this.glowColor,
-  });
+  const _GlassCard({required this.child, this.glowColor});
 
   @override
   Widget build(BuildContext context) {
@@ -982,10 +978,8 @@ class _StudentHomeState extends State<StudentHome> {
                   child: _ActionBtn(
                     label: 'Apply Volunteering',
                     icon: Icons.eco_rounded,
-                    onTap: () => Navigator.pushReplacementNamed(
-                      context,
-                      '/student/volunteering',
-                    ),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/student/volunteering'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -994,10 +988,8 @@ class _StudentHomeState extends State<StudentHome> {
                     label: 'Enroll Activity',
                     icon: Icons.flash_on_rounded,
                     outlined: true,
-                    onTap: () => Navigator.pushReplacementNamed(
-                      context,
-                      '/student/activities',
-                    ),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/student/activities'),
                   ),
                 ),
               ],
@@ -1119,10 +1111,8 @@ class _StudentHomeState extends State<StudentHome> {
                 label: 'View All Certificates',
                 icon: Icons.arrow_forward_rounded,
                 outlined: true,
-                onTap: () => Navigator.pushReplacementNamed(
-                  context,
-                  '/student/certificates',
-                ),
+                onTap: () =>
+                    Navigator.pushNamed(context, '/student/certificates'),
               ),
             ],
             const SizedBox(height: 20),
