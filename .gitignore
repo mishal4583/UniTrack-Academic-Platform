@@ -1,45 +1,100 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# =========================================
+# FLUTTER / DART
+# =========================================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
 
-# IntelliJ related
+# =========================================
+# IDE FILES
+# =========================================
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# =========================================
+# OS FILES
+# =========================================
+.DS_Store
+Thumbs.db
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+# =========================================
+# LOGS
+# =========================================
+*.log
 
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
+# =========================================
+# ANDROID
+# =========================================
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/key.properties
+/android/app/upload-keystore.jks
+/android/app/*.keystore
+/android/local.properties
+
+# =========================================
+# IOS
+# =========================================
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# =========================================
+# FIREBASE
+# =========================================
+google-services.json
+GoogleService-Info.plist
+firebase-adminsdk.json
+firebase-service-account.json
+serviceAccountKey.json
+
+# =========================================
+# ENV / API KEYS
+# =========================================
+.env
+.env.*
+*.env
+
+# =========================================
+# BLOCKCHAIN / WEB3
+# =========================================
+wallet.json
+private_key.txt
+mnemonic.txt
+secrets.json
+
+# =========================================
+# GENERATED FILES
+# =========================================
+*.g.dart
+*.freezed.dart
+
+# =========================================
+# MISC
+# =========================================
+*.swp
+.history/
+.svn/
+# Firebase
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# Environment files
+.env
+.env.*
+
+# Secrets
+serviceAccountKey.json
+firebase-adminsdk.json
+wallet.json
+private_key.txt

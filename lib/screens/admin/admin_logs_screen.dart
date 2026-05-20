@@ -807,7 +807,6 @@ class _BlockchainBadge extends StatelessWidget {
   }
 }
 
-
 // ─────────────────────────────────────────────
 // HASH CELL — truncated hash with copy button
 // ─────────────────────────────────────────────
